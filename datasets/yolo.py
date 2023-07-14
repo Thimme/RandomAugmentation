@@ -1,0 +1,94 @@
+from detectron2.data import DatasetCatalog, MetadataCatalog
+from detectron2.structures import BoxMode
+from .data_classes import DatasetInfo
+from dataclasses import dataclass
+import os
+import cv2
+
+
+class DetectionData:
+    def __init__(self, file_name: str):
+        self.filename = file_name
+        self.image_id = 0
+        self.annotations = []
+        self.calculate_size()
+
+
+    def calculate_size(self):
+        im = cv2.imread(self.filename)
+        self.width = im.shape[1]
+        self.height = im.shape[0]
+    
+    
+    def add_annotation(self, bbox: list, category_id: int):
+        a = AnnotationData(bbox, category_id)
+        self.annotations.append(a)
+
+
+    def to_dict(self):
+        return {
+            "file_name": self.filename, 
+            "height": self.height,
+            "width": self.width,
+            "image_id": self.image_id, 
+            "annotations": [ann.to_dict() for ann in self.annotations]
+        }
+
+
+@dataclass
+class AnnotationData:
+    bbox: list
+    category_id: int
+
+    def to_dict(self):
+        return {
+            "bbox": list, 
+            "bbox_mode": BoxMode.XYXY_ABS,
+            "category_id": self.category_id
+        }
+
+
+def load_yolo_annotation(image: str, annotation_fpath: str):
+    with open(annotation_fpath, "r") as f:
+        labels = f.readlines()
+
+        detection = DetectionData(file_name=image)
+
+        for label in labels: 
+            split = label.strip().split(' ')
+            x, y, width, height = float(split[1]), float(split[2]), float(split[3]), float(split[4])
+            xmin = (x - width / 2.0) * detection.width
+            ymin = (y - height / 2.0) * detection.height
+            xmax = (x + width / 2.0) * detection.width
+            ymax = (y + height / 2.0) * detection.height
+            
+            bbox = [xmin, ymin, xmax, ymax]
+            category = int(split[0])
+            annotation = AnnotationData(bbox=bbox,
+                                        category_id=category)
+            detection.add_annotation(annotation, category)
+
+        return detection
+
+
+def load_label_for_image(image: str, annotations: list):
+    annotation = image.split('/')[-1][:-4] + ".txt"
+    matching = [a for a in annotations if annotation in a]
+    assert len(matching) == 1
+    return matching[0]
+
+
+def load_yolo_annotations(images_root: str, annotations_fpath: DatasetInfo):
+    images = list(sorted(os.listdir(images_root)))
+    images = [os.path.join(images_root, image) for image in images]
+    annotations = list(sorted(os.listdir(annotations_fpath)))
+    annotations = [os.path.join(annotations_fpath, annotation) for annotation in annotations]
+
+    yolo_annotations = []
+
+    for img in images:
+        annotation = load_label_for_image(img, annotations)
+        yolo_annotations.append(load_yolo_annotation(img, annotation))
+    
+    dict = [ann.to_dict() for ann in yolo_annotations]
+    return dict
