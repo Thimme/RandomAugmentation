@@ -1,7 +1,8 @@
 from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.structures import BoxMode
-from .data_classes import DatasetInfo
+from ..data_classes import DatasetInfo
 from dataclasses import dataclass
+import numpy as np
 import os
 import cv2
 
@@ -10,7 +11,7 @@ class DetectionData:
     def __init__(self, file_name: str):
         self.filename = file_name
         self.image_id = 0
-        self.annotations = []
+        self.annotations = list()
         self.calculate_size()
 
 
@@ -20,9 +21,8 @@ class DetectionData:
         self.height = im.shape[0]
     
     
-    def add_annotation(self, bbox: list, category_id: int):
-        a = AnnotationData(bbox, category_id)
-        self.annotations.append(a)
+    def add_annotation(self, annotation):
+        self.annotations.append(annotation)
 
 
     def to_dict(self):
@@ -42,7 +42,7 @@ class AnnotationData:
 
     def to_dict(self):
         return {
-            "bbox": list, 
+            "bbox": self.bbox, 
             "bbox_mode": BoxMode.XYXY_ABS,
             "category_id": self.category_id
         }
@@ -51,7 +51,6 @@ class AnnotationData:
 def load_yolo_annotation(image: str, annotation_fpath: str):
     with open(annotation_fpath, "r") as f:
         labels = f.readlines()
-
         detection = DetectionData(file_name=image)
 
         for label in labels: 
@@ -62,11 +61,11 @@ def load_yolo_annotation(image: str, annotation_fpath: str):
             xmax = (x + width / 2.0) * detection.width
             ymax = (y + height / 2.0) * detection.height
             
-            bbox = [xmin, ymin, xmax, ymax]
+            bbox = [float(xmin), float(ymin), float(xmax), float(ymax)]
             category = int(split[0])
             annotation = AnnotationData(bbox=bbox,
                                         category_id=category)
-            detection.add_annotation(annotation, category)
+            detection.add_annotation(annotation)
 
         return detection
 
@@ -92,3 +91,7 @@ def load_yolo_annotations(images_root: str, annotations_fpath: DatasetInfo):
     
     dict = [ann.to_dict() for ann in yolo_annotations]
     return dict
+
+
+def load_yolo_classes():
+    return ["background", "car"]
