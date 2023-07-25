@@ -2,7 +2,8 @@ import numpy as np
 import torch
 from detectron2.data import transforms as T
 from fvcore.transforms.transform import Transform
-from randaug.data.transforms.image_corruptions import corrupt
+from randaug.data.transforms.corruptions import corrupt
+
 
 class WeatherTransform(Transform):
 
@@ -32,12 +33,30 @@ class MyColorAugmentation(T.Augmentation):
         return np.float32(x * r[0] + r[1] * 10)
         
 
-class FogAugmentation(T.Augmentation):
+class WeatherAugmentation(T.Augmentation):
 
-    def __init__(self, severity=1):
+    def __init__(self, name, severity=1):
         super().__init__()
-        self.name = "fog"
+        self.name = name
         self.severity = severity
 
     def get_transform(self, image):
         return WeatherTransform(name=self.name, severity=self.severity)
+    
+
+class RandomAugmentation():
+    
+    def __init__(self, cfg, transforms):
+        self.N = cfg.rand_N
+        self.M = cfg.rand_M
+        self.transforms = transforms
+    
+    def __repr__(self):
+        repr = '-'.join([t.__class__.__name__ for t in self.transforms])
+        return f'{self.N}-{self.M}-{repr}'
+    
+    def get_transforms(self):
+        return self.transforms
+
+
+    

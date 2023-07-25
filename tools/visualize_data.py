@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
+import sys
+sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation/") # bad code
+
 import argparse
 import os
 from itertools import chain
@@ -14,6 +17,7 @@ from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import Visualizer
 from randaug.data import datasets
 from randaug.engine.rand_trainer import RandTrainer
+
 
 def setup(args):
     cfg = get_cfg()

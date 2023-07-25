@@ -10,7 +10,7 @@ import cv2
 class DetectionData:
     def __init__(self, file_name: str):
         self.filename = file_name
-        self.image_id = 0
+        self.image_id = file_name.split('/')[-1][:-4]
         self.annotations = list()
         self.calculate_size()
 
