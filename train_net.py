@@ -1,9 +1,5 @@
 from detectron2.config import get_cfg
-from detectron2.utils.logger import setup_logger
-from detectron2.data import DatasetCatalog, MetadataCatalog
-from detectron2.engine import default_argument_parser, DefaultTrainer
-from detectron2.data import DatasetMapper, transforms as T
-from detectron2 import model_zoo
+from detectron2.engine import default_argument_parser, launch
 from randaug.engine import RandTrainer
 from randaug.engine.transform_sampler import TransformSampler
 from randaug.data import datasets
@@ -20,9 +16,10 @@ def setup(args):
 
 
 def main(args):
-    sampler = TransformSampler(cfg, [])
+    cfg = setup(args)
+    sampler = TransformSampler(cfg)
 
-    for augmentation in sampler.grid_search():
+    for augmentation in sampler.no_augmentation():
         trainer = RandTrainer(cfg, augmentation=augmentation) 
         trainer.resume_or_load(resume=args.resume)
         trainer.train()
@@ -36,9 +33,15 @@ def add_arguments():
 
 if __name__ == "__main__":
     args = add_arguments().parse_args()
-    cfg = setup(args)
     print("Command Line Args:", args)
-    main(args)
+    launch(
+        main,
+        args.num_gpus,
+        num_machines=args.num_machines,
+        machine_rank=args.machine_rank,
+        dist_url=args.dist_url,
+        args=(args,),
+    )
 
 
 

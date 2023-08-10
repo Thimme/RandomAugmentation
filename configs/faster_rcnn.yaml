@@ -12,12 +12,12 @@ SOLVER:
   BASE_LR: 0.001
   WARMUP_ITERS: 1000
   STEPS: (210000, 250000)
-  MAX_ITER: 100
+  MAX_ITER: 5000
   GAMMA: 0.052
 DATASETS:
-  TRAIN: ("midjourney_fog",)
-  TEST: ("midjourney_fog",)
+  TRAIN: ("dawn_sand",)
+  TEST: ("adverse_fog",)
 DATALOADER:
   NUM_WORKERS: 4
 TEST:
-  EVAL_PERIOD: 1000
+  EVAL_PERIOD: 5000

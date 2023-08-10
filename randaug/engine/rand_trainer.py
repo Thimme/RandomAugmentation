@@ -1,7 +1,7 @@
 import os
 import logging
 import weakref
-import sys
+import torch
 from collections import OrderedDict
 
 from detectron2.engine import DefaultTrainer, hooks
@@ -14,6 +14,7 @@ from detectron2.utils import comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.solver import build_lr_scheduler, build_optimizer
 from detectron2.modeling import build_model
+from detectron2.modeling.roi_heads import build_roi_heads
 from detectron2.evaluation.testing import flatten_results_dict
 from detectron2.evaluation import (
     DatasetEvaluator,
@@ -165,6 +166,7 @@ class RandTrainer(TrainerBase):
         Overwrite it if you'd like a different model.
         """
         model = build_model(cfg)
+        #model.roi_heads = build_roi_heads(cfg, model.backbone.output_shape()).to(torch.device(cfg.MODEL.DEVICE))
         logger = logging.getLogger(__name__)
         logger.info("Model:\n{}".format(model))
         return model

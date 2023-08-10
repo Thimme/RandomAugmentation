@@ -46,14 +46,17 @@ class WeatherAugmentation(T.Augmentation):
 
 class RandomAugmentation():
     
-    def __init__(self, cfg, transforms):
-        self.N = cfg.rand_N
-        self.M = cfg.rand_M
-        self.transforms = transforms
+    def __init__(self, N, M, transforms):
+        self.N = N
+        self.M = M # list of magnitudes
+        self.transforms = transforms # list of transforms
     
     def __repr__(self):
-        repr = '-'.join([t.__class__.__name__ for t in self.transforms])
-        return f'{self.N}-{self.M}-{repr}'
+        if len(self.transforms):
+            repr = '-'.join([f'{t.__class__.__name__}-{m}' for t, m in zip(self.transforms, self.M)])
+        else:
+            repr = "no-augmentation"
+        return f'{self.N}-{repr}'
     
     def get_transforms(self):
         return self.transforms

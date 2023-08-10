@@ -48,7 +48,7 @@ class AnnotationData:
         }
 
 
-def load_yolo_annotation(image: str, annotation_fpath: str):
+def load_annotation(image: str, annotation_fpath: str):
     with open(annotation_fpath, "r") as f:
         labels = f.readlines()
         detection = DetectionData(file_name=image)
@@ -70,24 +70,23 @@ def load_yolo_annotation(image: str, annotation_fpath: str):
         return detection
 
 
-def load_label_for_image(image: str, annotations: list):
+def load_label_for_image(image: str, annotations_fpath: str):
     annotation = image.split('/')[-1][:-4] + ".txt"
-    matching = [a for a in annotations if annotation in a]
-    assert len(matching) == 1
-    return matching[0]
+    return os.path.join(annotations_fpath, annotation)
 
 
-def load_yolo_annotations(images_root: str, annotations_fpath: DatasetInfo):
+def load_yolo_annotations(images_root: str, annotations_fpath: str):
     images = list(sorted(os.listdir(images_root)))
     images = [os.path.join(images_root, image) for image in images]
-    annotations = list(sorted(os.listdir(annotations_fpath)))
-    annotations = [os.path.join(annotations_fpath, annotation) for annotation in annotations]
+    #annotations = list(sorted(os.listdir(annotations_fpath)))
+    #annotations = [os.path.join(annotations_fpath, annotation) for annotation in annotations]
 
     yolo_annotations = []
 
     for img in images:
-        annotation = load_label_for_image(img, annotations)
-        yolo_annotations.append(load_yolo_annotation(img, annotation))
+        annotation = load_label_for_image(img, annotations_fpath)
+        if os.path.isfile(annotation):
+            yolo_annotations.append(load_annotation(img, annotation))
     
     dict = [ann.to_dict() for ann in yolo_annotations]
     return dict

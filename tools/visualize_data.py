@@ -17,6 +17,7 @@ from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import Visualizer
 from randaug.data import datasets
 from randaug.engine.rand_trainer import RandTrainer
+from randaug.engine.transform_sampler import TransformSampler
 
 
 def setup(args):
@@ -25,6 +26,8 @@ def setup(args):
         cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     cfg.DATALOADER.NUM_WORKERS = 0
+    cfg.rand_N = 2 # number of transforms
+    cfg.rand_M = 10 # magnitude of transforms
     cfg.freeze()
     return cfg
 
@@ -71,7 +74,9 @@ if __name__ == "__main__":
 
     scale = 1.0
     if args.source == "dataloader":
-        train_data_loader = RandTrainer.build_train_loader(cfg=cfg)
+        sampler = TransformSampler(cfg)
+        transforms = sampler.no_augmentation()
+        train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=transforms[0].get_transforms())
         for batch in train_data_loader:
             for per_image in batch:
                 # Pytorch tensor is in (C, H, W) format
