@@ -11,7 +11,7 @@ def setup(args):
     cfg.merge_from_file("configs/faster_rcnn.yaml")
     cfg.eval_output = "./evaluation"
     cfg.rand_N = 2 # number of transforms
-    cfg.rand_M = 10 # magnitude of transforms
+    cfg.rand_M = 5 # magnitude of transforms
     return cfg
 
 
@@ -19,7 +19,7 @@ def main(args):
     cfg = setup(args)
     sampler = TransformSampler(cfg)
 
-    for augmentation in sampler.no_augmentation():
+    for augmentation in sampler.grid_search():
         trainer = RandTrainer(cfg, augmentation=augmentation) 
         trainer.resume_or_load(resume=args.resume)
         trainer.train()

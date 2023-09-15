@@ -8,7 +8,7 @@ from detectron2.engine import DefaultTrainer, hooks
 from detectron2.engine.train_loop import AMPTrainer, SimpleTrainer, TrainerBase
 from detectron2.engine.defaults import create_ddp_model, default_writers
 from detectron2.evaluation import COCOEvaluator
-from detectron2.data import build_detection_train_loader, build_detection_test_loader, DatasetMapper
+from detectron2.data import build_detection_train_loader, build_detection_test_loader
 from detectron2.utils.logger import setup_logger
 from detectron2.utils import comm
 from detectron2.checkpoint import DetectionCheckpointer
@@ -25,6 +25,7 @@ from detectron2.evaluation import (
 
 from randaug.data.transforms import transforms as W
 from randaug.utils.results_writer import JSONResultsWriter
+from randaug.data.dataset_mapper import MyDatasetMapper
 
 
 class RandTrainer(TrainerBase):
@@ -92,7 +93,7 @@ class RandTrainer(TrainerBase):
 
     def state_dict(self):
         ret = super().state_dict()
-        ret["_trainer"] = self._trainer.state_dict()
+        ret["_trainer"] = self._trainer.state_dict() # type: ignore
         return ret
     
     def load_state_dict(self, state_dict):
@@ -197,7 +198,7 @@ class RandTrainer(TrainerBase):
     
     @classmethod
     def build_train_loader(cls, cfg, transforms):
-        mapper = DatasetMapper(cfg, is_train=True, augmentations=transforms)
+        mapper = MyDatasetMapper(cfg, is_train=True, augmentations=transforms)
         return build_detection_train_loader(cfg, mapper=mapper)
     
     @classmethod

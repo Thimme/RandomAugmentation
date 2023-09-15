@@ -122,8 +122,23 @@ bdd_snow = DatasetInfo(name="bdd_snow",
                        annotations_fpath="bdd100k/snow/labels")
 
 # -------- WAYMO -----------
+waymo_clear = DatasetInfo(name="waymo_clear",
+                          images_root="waymo/images",
+                          annotations_fpath="waymo/labels")
 
 # -------- PROVIDENTIA -----------
+providentia_clear = DatasetInfo(name="providentia_clear",
+                       images_root="providentia/clear/images",
+                       annotations_fpath="providentia/clear/labels")
+
+providentia_fog = DatasetInfo(name="providentia_fog",
+                       images_root="providentia/fog/images",
+                       annotations_fpath="providentia/fog/labels")
+
+providentia_snow = DatasetInfo(name="providentia_snow",
+                       images_root="providentia/snow/images",
+                       annotations_fpath="providentia/snow/labels")
+
 
 # -------- CITYSCAPES -----------
 cityscapes_clear = DatasetInfo(name="cityscapes_clear",
@@ -200,3 +215,9 @@ register_acdc(DEFAULT_DATASETS_ROOT, acdc_clear)
 register_acdc(DEFAULT_DATASETS_ROOT, acdc_rain)
 register_acdc(DEFAULT_DATASETS_ROOT, acdc_fog)
 register_acdc(DEFAULT_DATASETS_ROOT, acdc_snow)
+
+register_providentia(DEFAULT_DATASETS_ROOT, providentia_clear)
+register_providentia(DEFAULT_DATASETS_ROOT, providentia_fog)
+register_providentia(DEFAULT_DATASETS_ROOT, providentia_snow)
+
+# register_waymo(DEFAULT_DATASETS_ROOT, waymo_clear)

@@ -3,8 +3,7 @@ import numpy as np
 import sys
 
 from detectron2.data.transforms.augmentation_impl import *
-from randaug.data.transforms.magnitude_mapper import map_magnitude_to_args
-from randaug.data.transforms.transforms import RandomAugmentation
+from randaug.data.transforms.transforms import *
 
 from itertools import product
 
@@ -25,9 +24,19 @@ from itertools import product
 #     "RandomResize",
 #     "MinIoURandomCrop",
 # ]
+
+
+# ShearX/Y,
+# TranslateX/Y, Rotate, AutoContrast, Invert, Equalize, Solarize, Posterize, Contrast, Color, Brightness, Sharpness,
+# Cutout, Sample Pairing
+# apply flip with 0.5 to every frame
+
+
 transforms = [ 
-    "FixedSizeCrop",
-    "RandomBrightness",
+    "ColorAugmentation",
+    "CycleGANAugmentation",
+    "FogAugmentation",
+    "RainAugmentation",
     "RandomFlip",
 ]
 
@@ -42,8 +51,7 @@ class TransformSampler():
         
     def _map_to_transforms(self, ops):
         transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
-        args = [map_magnitude_to_args(op[0], [op[1]]) for op in ops]
-        transforms = [t(**arg) for t, arg in zip(transforms, args)]
+        transforms = [t(op[1]) for t, op in zip(transforms, ops)]
         magnitudes = [op[1] for op in ops]
         return transforms, magnitudes
     
@@ -66,15 +74,16 @@ class TransformSampler():
         ops = self._sample_augmentation(magnitude=self.cfg.rand_M)
         augs = [self._map_to_transforms(op) for op in ops]
         augs = [RandomAugmentation(self.cfg.rand_N, aug[1], aug[0]) for aug in augs]
-        print(augs)
         return augs
     
     def random_search(self):
         ops = self._sample_augmentation(magnitude=None)
         augs = [self._map_to_transforms(op) for op in ops]
         augs = [RandomAugmentation(self.cfg.rand_N, aug[1], aug[0]) for aug in augs]
-        print(augs)
         return augs
     
     def no_augmentation(self):
         return [RandomAugmentation(self.cfg.rand_N, 1, [])]
+    
+    def test(self):
+        return [RandomAugmentation(self.cfg.rand_N, 1, [ColorAugmentation(magnitude=10)])]

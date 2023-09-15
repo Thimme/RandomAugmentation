@@ -45,7 +45,7 @@ def corrupt(image, severity=1, corruption_name=None, corruption_number=-1, devic
     if image.ndim == 2:
         image = np.stack((image,)*3, axis=-1)
     
-    height, width, channels = image.shape
+    height, width, channels = image.shape # type: ignore
     
     if (height < 32 or width < 32):
         raise AttributeError('Image width and height must be at least 32 pixels')

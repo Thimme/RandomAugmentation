@@ -15,7 +15,7 @@ SOLVER:
   MAX_ITER: 5000
   GAMMA: 0.052
 DATASETS:
-  TRAIN: ("dawn_sand",)
+  TRAIN: ("adverse_clear",)
   TEST: ("adverse_fog",)
 DATALOADER:
   NUM_WORKERS: 4
