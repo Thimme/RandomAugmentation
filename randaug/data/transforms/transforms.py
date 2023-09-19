@@ -1,10 +1,13 @@
 import numpy as np
 import torch
 import PIL, PIL.ImageOps, PIL.ImageEnhance, PIL.ImageDraw
+import albumentations as A
+from PIL import Image
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
 from fvcore.transforms.transform import Transform
 from randaug.data.transforms.corruptions import corrupt
+from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from enum import Enum
             
 class Augmentations(Enum):
@@ -127,9 +130,10 @@ class ShearXAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
-        return T.ColorTransform(func)    
+        v = np.linspace(-20, 20, num=self.magnitude+1) # Shear in degrees 
+        transform = A.Affine(shear={'x': v[self.magnitude], 'y': 0})
+        params = prepare_param(transform, image)
+        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
 
 
 class ShearYAugmentation(T.Augmentation):
@@ -140,10 +144,10 @@ class ShearYAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
-        return T.ColorTransform(func)
-
+        v = np.linspace(-20, 20, num=self.magnitude+1) # Shear in degrees 
+        transform = A.Affine(shear={'x': 0, 'y': v[self.magnitude]})
+        params = prepare_param(transform, image)
+        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
 
 class TranslateXAugmentation(T.Augmentation):
      
@@ -153,9 +157,10 @@ class TranslateXAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image): 
-        v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
-        return T.ColorTransform(func)    
+        v = np.linspace(-0.45, 0.45, num=self.magnitude+1)
+        transform = A.Affine(translate_percent={'x': v[self.magnitude], 'y': 0})
+        params = prepare_param(transform, image)
+        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
 
 
 class TranslateYAugmentation(T.Augmentation):
@@ -166,9 +171,10 @@ class TranslateYAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
-        return T.ColorTransform(func)    
+        v = np.linspace(-0.45, 0.45, num=self.magnitude+1)
+        transform = A.Affine(translate_percent={'x': 0, 'y': v[self.magnitude]})
+        params = prepare_param(transform, image)
+        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))  
 
 
 class RotationAugmentation(T.Augmentation):
@@ -193,7 +199,7 @@ class AutoContrastAugmentation(T.Augmentation):
         
     def get_transform(self, image): # missing
         v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
+        func = lambda x, v: PIL.ImageOps.autocontrast(image)
         return T.ColorTransform(func)    
 
 
@@ -206,7 +212,7 @@ class InvertAugmentation(T.Augmentation):
         
     def get_transform(self, image): # missing
         v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
+        func = lambda x, v: PIL.ImageOps.invert(image)
         return T.PILColorTransform(func)
 
 
@@ -219,7 +225,7 @@ class EqualizeAugmentation(T.Augmentation):
         
     def get_transform(self, image): # missing
         v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
+        func = lambda x, v: PIL.ImageOps.equalize(image)
         return T.ColorTransform(func)    
 
 
@@ -302,7 +308,6 @@ class SharpnessAugmentation(T.Augmentation):
         return T.PILColorTransform(func)
     
 
-# gemoetric?
 class CutoutAugmentation(T.Augmentation):
      
     def __init__(self, magnitude=1):
@@ -311,23 +316,13 @@ class CutoutAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(0.0, 0.2, num=self.magnitude+1)
-        func = lambda x: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
-        return T.ColorTransform(func)
-    
-
-# geometric?
-class SamplePairingAugmentation(T.Augmentation):
-     
-    def __init__(self, magnitude=1):
-        super().__init__()
-        self.name = Augmentations.SAMPLE_PAIRING
-        self.magnitude = magnitude
-        
-    def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=self.magnitude+1)
-        func = lambda x, v: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude-1])
-        return T.ColorTransform(func)
+        v = np.linspace(0, 10, num=self.magnitude+1)
+        m = int(v[self.magnitude])
+        transform = A.CoarseDropout(min_holes=m, max_holes=m*8, 
+                                    min_height=m, max_height=m*12, 
+                                    min_width=m, max_width=m*12, p=1.0)
+        params = prepare_param(transform, image)
+        return AlbumentationsTransform(transform, params, size=image.shape[:2])
     
 
 # Wrapper class for random augmentations
@@ -387,4 +382,3 @@ class GANTransform(Transform):
     def apply_segmentation(self, segmentation):
         return segmentation
     
-
