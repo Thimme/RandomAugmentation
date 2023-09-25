@@ -58,6 +58,7 @@ class MyAugInput:
         self.file_name = file_name
         self.boxes = boxes
         self.sem_seg = sem_seg
+        self.transforms = []
 
     def transform(self, tfm: Transform) -> None:
         """
@@ -67,6 +68,7 @@ class MyAugInput:
         as ``self.image`` will return transformed data.
         """
         self.image = tfm.apply_image(self.image) # type: ignore
+        self.transforms.append(tfm)
         if self.boxes is not None:
             self.boxes = tfm.apply_box(self.boxes)
         if self.sem_seg is not None:

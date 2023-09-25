@@ -86,4 +86,4 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg.rand_N, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg.rand_N, 1, [CutoutAugmentation(magnitude=10)])]
+        return [RandomAugmentation(self.cfg.rand_N, 1, [SolarizeAugmentation(magnitude=10), BrightnessAugmentation(magnitude=10)])]
