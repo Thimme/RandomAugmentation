@@ -7,38 +7,44 @@ from randaug.data.transforms.transforms import *
 
 from itertools import product
 
-# transforms = [ 
-#     "FixedSizeCrop",
-#     "RandomBrightness",
-#     "RandomContrast",
-#     "RandomCrop",
-#     "RandomExtent",
-#     "RandomFlip",
-#     "RandomSaturation",
-#     "RandomLighting",
-#     "RandomRotation",
-#     "Resize",
-#     "ResizeScale",
-#     "ResizeShortestEdge",
-#     "RandomCrop_CategoryAreaConstraint",
-#     "RandomResize",
-#     "MinIoURandomCrop",
-# ]
 
-
-# ShearX/Y,
-# TranslateX/Y, Rotate, AutoContrast, Invert, Equalize, Solarize, Posterize, Contrast, Color, Brightness, Sharpness,
-# Cutout, Sample Pairing
-# apply flip with 0.5 to every frame
-
-
-transforms = [ 
-    "ColorAugmentation",
-    "CycleGANAugmentation",
-    "FogAugmentation",
-    "RainAugmentation",
-    "RandomFlip",
+gan_transforms = [ 
+    # "CycleGANFogAugmentation",
+    # "CycleGANRainAugmentation",
+    # "CycleGANSnowAugmentation",
+    # "CUTFogAugmentation",
+    # "CUTRainAugmentation",
+    # "CUTSnowAugmentation",
+    # "StableDiffusionFogAugmentation",
+    # "StableDiffusionRainAugmentation",
+    # "StableDiffusionSnowAugmentation",
+    # "CycleDiffusionFogAugmentation",
+    # "CycleDiffusionRainAugmentation",
+    # "CycleDiffusionSnowAugmentation"
 ]
+
+image_transforms = [
+    "ColorAugmentation",
+    "ShearXAugmentation",
+    "ShearYAugmentation",
+    "FogAugmentation",
+    "SnowAugmentation",
+    "DropAugmentation",
+    "RainAugmentation",
+    "TranslateXAugmentation",
+    "TranslateYAugmentation",
+    "RotationAugmentation",
+    "AutoContrastAugmentation",
+    "InvertAugmentation",
+    "EqualizeAugmentation",
+    "SolarizeAugmentation",
+    "PosterizeAugmentation",
+    "ContrastAugmentation",
+    "BrightnessAugmentation",
+    "SharpnessAugmentation",
+    "CutoutAugmentation"
+]
+
 
 class TransformSampler():
 
@@ -47,7 +53,7 @@ class TransformSampler():
         np.random.seed(42) # random seed is required for parallelisation to have same magnitudes on every process
 
     def _sample_transforms(self, N):
-        return [t for t in product(transforms, repeat = N)]
+        return [t for t in product(gan_transforms + image_transforms, repeat = N)]
         
     def _map_to_transforms(self, ops):
         transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
@@ -69,21 +75,48 @@ class TransformSampler():
             return np.random.randint(1, 10)
         else:
             return m
+        
+    def _filter_image_augmentations(self, ops):
+        filtered = self._filter_gan_augmentations(ops)
+        filtered = self._filter_duplicates(filtered)
+        return filtered
+    
+    def _filter_gan_augmentations(self, ops):
+        if len(ops[0]) <= 1:
+            return ops
+        filtered = []
+        for op in ops:
+            second_aug = op[1][0]
+            if second_aug not in gan_transforms:
+                filtered.append(op)
+        return filtered
+
+    def _filter_duplicates(self, ops):
+        if len(ops[0]) <= 1:
+            return ops
+        filtered = []
+        for op in ops:
+            if op[0][0] != op[1][0]:
+                filtered.append(op)
+        return filtered
 
     def grid_search(self):
         ops = self._sample_augmentation(magnitude=self.cfg.rand_M)
+        ops = self._filter_image_augmentations(ops)
+        print(len(ops))
         augs = [self._map_to_transforms(op) for op in ops]
-        augs = [RandomAugmentation(self.cfg.rand_N, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
         return augs
     
     def random_search(self):
         ops = self._sample_augmentation(magnitude=None)
+        ops = self._filter_image_augmentations(ops)
         augs = [self._map_to_transforms(op) for op in ops]
-        augs = [RandomAugmentation(self.cfg.rand_N, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
         return augs
     
     def no_augmentation(self):
-        return [RandomAugmentation(self.cfg.rand_N, 1, [])]
+        return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg.rand_N, 1, [SolarizeAugmentation(magnitude=10), BrightnessAugmentation(magnitude=10)])]
+        return [RandomAugmentation(self.cfg, 1, [CutoutAugmentation(magnitude=4)])]

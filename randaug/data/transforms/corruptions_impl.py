@@ -287,9 +287,9 @@ def next_power_of_2(x):
 def fog(x, severity=1, device=None):
     c = [(1.5, 2), 
          (2., 2), 
-         (2.5, 1.7),
-         (2.5, 1.5),
-         (3., 1.4)][severity - 1]
+         (3, 1.7),
+         (4, 1.5),
+         (5., 1.4)][severity - 1]
 
     shape = np.array(x).shape
     max_side = np.max(shape)

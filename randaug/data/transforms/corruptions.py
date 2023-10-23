@@ -68,7 +68,7 @@ def corrupt(image, severity=1, corruption_name=None, corruption_number=-1, devic
     else:
         raise ValueError("Either corruption_name or corruption_number must be passed")
 
-    return np.float32(image_corrupted)
+    return np.uint8(image_corrupted)
 
 def get_corruption_names(subset='common'):
     if subset == 'common':

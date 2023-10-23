@@ -22,5 +22,6 @@ def register_dataset(datasets_root: Optional[str] = None, dataset_data: DatasetI
     MetadataCatalog.get(dataset_data.name).set(
         image_root=dataset_data.images_root,
         annotations_fpath = dataset_data.annotations_fpath,
-        thing_classes=load_yolo_classes()
+        thing_classes=load_yolo_classes(),
+        evaluator_type="coco",
     )

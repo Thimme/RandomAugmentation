@@ -33,7 +33,15 @@ adverse_clear = DatasetInfo(name="adverse_clear",
                             images_root="adverse/clear/images",
                             annotations_fpath="adverse/clear/labels")
 
-adverse_fog = DatasetInfo(name="adverse_fog", 
+adverse_clear_addon_01 = DatasetInfo(name="adverse_clear_addon_01", 
+                            images_root="adverse/clear_addon_01/images",
+                            annotations_fpath="adverse/clear_addon_01/labels")
+
+adverse_clear_addon_02 = DatasetInfo(name="adverse_clear_addon_02",
+                            images_root="adverse/clear_addon_02/images",
+                            annotations_fpath="adverse/clear_addon_02/labels")
+
+adverse_fog = DatasetInfo(name="adverse_fog",
                           images_root="adverse/fog/images",
                           annotations_fpath="adverse/fog/labels")
 
@@ -180,6 +188,8 @@ register_midjourney(DEFAULT_DATASETS_ROOT, mj_rain)
 register_midjourney(DEFAULT_DATASETS_ROOT, mj_snow)
 
 register_adverse(DEFAULT_DATASETS_ROOT, adverse_clear)
+register_adverse(DEFAULT_DATASETS_ROOT, adverse_clear_addon_01)
+register_adverse(DEFAULT_DATASETS_ROOT, adverse_clear_addon_02)
 register_adverse(DEFAULT_DATASETS_ROOT, adverse_fog)
 register_adverse(DEFAULT_DATASETS_ROOT, adverse_rain)
 register_adverse(DEFAULT_DATASETS_ROOT, adverse_snow)
@@ -199,7 +209,7 @@ register_dawn(DEFAULT_DATASETS_ROOT, dawn_rain)
 register_dawn(DEFAULT_DATASETS_ROOT, dawn_sand)
 register_dawn(DEFAULT_DATASETS_ROOT, dawn_snow)
 
-register_nuscenes(DEFAULT_DATASETS_ROOT, nuscenes_clear)
+register_nuscenes(DEFAULT_DATASETS_ROOT, nuscenes_clear) 
 register_nuscenes(DEFAULT_DATASETS_ROOT, nuscenes_rain)
 
 register_bdd(DEFAULT_DATASETS_ROOT, bdd_clear)

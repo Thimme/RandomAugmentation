@@ -1,25 +1,30 @@
 import numpy as np
 import torch
-import PIL, PIL.ImageOps, PIL.ImageEnhance, PIL.ImageDraw
 import albumentations as A
-from PIL import Image
+import torchvision.transforms
+import cv2
+import os
+import math
+from PIL import Image, ImageOps, ImageEnhance, ImageDraw
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
 from fvcore.transforms.transform import Transform, TransformList
 from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
+from randaug.data.classifier.classifier import SimpleClassifier
 from enum import Enum
 
-MAGNITUDE_BINS = 11 
+MAGNITUDE_BINS = 5 
 
 class Augmentations(Enum):
 
     def __str__(self):
         return str(self.value)
 
-    CYCLE_GAN = 'cycle_gan'
+    CYCLE_GAN = 'cyclegan'
     CUT = 'cut'
-    SAE = 'swapping_autoencoder'
+    CYCLE_DIFFUSION = 'cyclediffusion'
+    STABLE_DIFFUSION = 'stablediffusion'
     FOG = 'fog'
     RAIN = 'rain'
     SNOW = 'snow'
@@ -40,7 +45,6 @@ class Augmentations(Enum):
     BRIGHTNESS = 'brightness'
     SHARPNESS = 'sharpness'
     CUTOUT = 'cutout'
-    SAMPLE_PAIRING = 'sample_pairing'
 
 
 # Own augmentations
@@ -52,7 +56,7 @@ class FogAugmentation(T.Augmentation):
         self.magnitude = magnitude
 
     def get_transform(self, image):
-        return WeatherTransform(name=self.name, severity=self.magnitude)
+        return WeatherTransform(name=str(self.name), severity=math.floor((self.magnitude+1)/2))
     
 
 class RainAugmentation(T.Augmentation):
@@ -63,7 +67,7 @@ class RainAugmentation(T.Augmentation):
         self.magnitude = magnitude
 
     def get_transform(self, image):
-        return WeatherTransform(name=self.name, severity=self.magnitude)
+        return WeatherTransform(name=str(self.name), severity=math.floor((self.magnitude+1)/2))
 
 
 class SnowAugmentation(T.Augmentation):
@@ -74,9 +78,10 @@ class SnowAugmentation(T.Augmentation):
         self.magnitude = magnitude
 
     def get_transform(self, image):
-        return WeatherTransform(name=self.name, severity=self.magnitude)
+        return WeatherTransform(name=str(self.name), severity=math.floor((self.magnitude+1)/2))
 
 
+# run on GPU
 class DropAugmentation(T.Augmentation):
 
     def __init__(self, magnitude=1):
@@ -85,40 +90,151 @@ class DropAugmentation(T.Augmentation):
         self.magnitude = magnitude
 
     def get_transform(self, image):
-        return WeatherTransform(name=self.name, severity=self.magnitude)
+        return WeatherTransform(name=str(self.name), severity=math.floor((self.magnitude+1)/2))
     
 
-class CycleGANAugmentation(T.Augmentation):
+class CycleGANFogAugmentation(T.Augmentation):
 
     def __init__(self, magnitude=1):
         super().__init__()
         self.name = Augmentations.CYCLE_GAN
+        self.weather = Augmentations.FOG
         self.magnitude = magnitude
 
     def get_transform(self, image, file_name):
-        return GANTransform(network=self.name, severity=self.magnitude, file_name=file_name)
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
 
 
-class CUTAugmentation(T.Augmentation):
+class CycleGANRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CYCLE_GAN
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class CycleGANSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CYCLE_GAN
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class CUTFogAugmentation(T.Augmentation):
 
     def __init__(self, magnitude=1):
         super().__init__()
         self.name = Augmentations.CUT
+        self.weather = Augmentations.FOG
         self.magnitude = magnitude
 
     def get_transform(self, image, file_name):
-        return GANTransform(network=self.name, severity=self.magnitude, file_name=file_name)
-    
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
 
-class SAEAugmentation(T.Augmentation):
+
+class CUTRainAugmentation(T.Augmentation):
 
     def __init__(self, magnitude=1):
         super().__init__()
-        self.name = Augmentations.SAE
+        self.name = Augmentations.CUT
+        self.weather = Augmentations.RAIN
         self.magnitude = magnitude
 
     def get_transform(self, image, file_name):
-        return GANTransform(network=self.name, severity=self.magnitude, file_name=file_name)
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class CUTSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CUT
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class CycleDiffusionFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CYCLE_DIFFUSION
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+
+
+class CycleDiffusionRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CYCLE_DIFFUSION
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class CycleDiffusionSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CYCLE_DIFFUSION
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class StableDiffusionFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.STABLE_DIFFUSION
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class StableDiffusionRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.STABLE_DIFFUSION
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class StableDiffusionSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.STABLE_DIFFUSION
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
     
 
 # Augmentations from paper: 
@@ -150,6 +266,7 @@ class ShearYAugmentation(T.Augmentation):
         transform = A.Affine(shear={'x': 0, 'y': v[self.magnitude]})
         params = prepare_param(transform, image)
         return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
+
 
 class TranslateXAugmentation(T.Augmentation):
      
@@ -200,7 +317,7 @@ class AutoContrastAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        func = lambda x: PIL.ImageOps.autocontrast(x)
+        func = lambda x: ImageOps.autocontrast(x)
         return T.PILColorTransform(func)    
 
 
@@ -212,7 +329,7 @@ class InvertAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        func = lambda x: PIL.ImageOps.invert(x)
+        func = lambda x: ImageOps.invert(x)
         return T.PILColorTransform(func)
 
 
@@ -224,7 +341,7 @@ class EqualizeAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        func = lambda x: PIL.ImageOps.equalize(x)
+        func = lambda x: ImageOps.equalize(x)
         return T.PILColorTransform(func)    
 
 
@@ -237,7 +354,7 @@ class SolarizeAugmentation(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(256, 0, num=MAGNITUDE_BINS)
-        func = lambda x: PIL.ImageOps.solarize(x, v[self.magnitude])
+        func = lambda x: ImageOps.solarize(x, v[self.magnitude])
         return T.PILColorTransform(func)
 
 
@@ -250,7 +367,7 @@ class PosterizeAugmentation(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(8, 1, num=MAGNITUDE_BINS)
-        func = lambda x: PIL.ImageOps.posterize(x, int(v[self.magnitude]))
+        func = lambda x: ImageOps.posterize(x, int(v[self.magnitude]))
         return T.PILColorTransform(func)
 
 
@@ -263,7 +380,7 @@ class ContrastAugmentation(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: PIL.ImageEnhance.Contrast(x).enhance(v[self.magnitude])
+        func = lambda x: ImageEnhance.Contrast(x).enhance(v[self.magnitude])
         return T.PILColorTransform(func)    
 
 
@@ -276,7 +393,7 @@ class ColorAugmentation(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: PIL.ImageEnhance.Color(x).enhance(v[self.magnitude])
+        func = lambda x: ImageEnhance.Color(x).enhance(v[self.magnitude])
         return T.PILColorTransform(func)
     
 
@@ -289,7 +406,7 @@ class BrightnessAugmentation(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: PIL.ImageEnhance.Brightness(x).enhance(v[self.magnitude])
+        func = lambda x: ImageEnhance.Brightness(x).enhance(v[self.magnitude])
         return T.PILColorTransform(func)
     
 
@@ -302,7 +419,7 @@ class SharpnessAugmentation(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: PIL.ImageEnhance.Sharpness(x).enhance(v[self.magnitude])
+        func = lambda x: ImageEnhance.Sharpness(x).enhance(v[self.magnitude])
         return T.PILColorTransform(func)
     
 
@@ -330,7 +447,7 @@ class BoundingboxAugmentation(T.Augmentation):
     
     def get_transform(self, image, file_name, transforms):
         if self.algorithm == 'invalidate':
-            return InvalidateBBTransform(image=image, file_name=file_name, transforms=transforms)
+            return SimpleBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'adjust':
             return AdjustBBTransform(image=image, file_name=file_name, transforms=transforms)
         else:
@@ -340,8 +457,8 @@ class BoundingboxAugmentation(T.Augmentation):
 # Wrapper class for random augmentations
 class RandomAugmentation():
     
-    def __init__(self, N, M, augmentations):
-        self.N = N
+    def __init__(self, cfg, M, augmentations):
+        self.cfg = cfg
         self.M = M # list of magnitudes
         self.augmentations = augmentations # list of transforms
     
@@ -350,12 +467,13 @@ class RandomAugmentation():
             repr = '-'.join([f'{t.__class__.__name__}-{m}' for t, m in zip(self.augmentations, self.M)])
         else:
             repr = "no-augmentation"
-        return f'{self.N}-{repr}'
+        return f'{self.cfg.rand_N}-{repr}'
     
     def get_transforms(self):
-        arr = self._prepend_standard_transform() + self.augmentations + self._append_standard_transform()
-        print(arr)
-        return self._prepend_standard_transform() + self.augmentations + self._append_standard_transform()
+        if self.cfg.box_postprocessing == True:
+            return self._prepend_standard_transform() + self.augmentations + self._append_standard_transform()
+        else:
+            return self._prepend_standard_transform() + self.augmentations
     
     def _prepend_standard_transform(self):
         aug = T.RandomFlip(prob=0.5)
@@ -366,7 +484,6 @@ class RandomAugmentation():
         return [aug]
     
 
-    # rename Transforms
 class WeatherTransform(Transform):
 
     def __init__(self, name, severity):
@@ -387,15 +504,19 @@ class WeatherTransform(Transform):
 
 class GANTransform(Transform):
 
-    def __init__(self, network, severity, file_name):
+    def __init__(self, network, weather, severity, file_path):
         super().__init__()
-        self.name = str(network)
+        self.name = network
+        self.weather = weather
         self.severity = severity
-        self.file_name = file_name
+        self.file_path = file_path
 
     def apply_image(self, img: np.ndarray):
-        path = self.file_name.split('/')
-        path = '/'.join(path[:6]) + f'/augmentation/{self.name}/' + '/'.join(path[8:])
+        filename = self.file_path.split('/')[-1]
+        filename_jpg = f'{filename[:-4]}.jpg'
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        if not os.path.isfile(path):
+            path = f'{path[:-4]}.png'
         return utils.read_image(path, format="BGR")
         
     def apply_coords(self, coords):
@@ -415,14 +536,13 @@ class InvalidateBBTransform(Transform):
         self.image = image
         self.file_name = file_name
         self.previous = TransformList(transforms) # previous transforms
+        self.transformed = self.previous.apply_image(utils.read_image(self.file_name, format="BGR"))
 
     def apply_image(self, img: np.ndarray):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         try:
-            img = utils.read_image(self.file_name, format="BGR")
-            transformed = self.previous.apply_image(img)
             return self._invalidate_bbox()
         except (AttributeError, NotImplementedError):
             return box  
@@ -447,16 +567,14 @@ class AdjustBBTransform(Transform):
         super().__init__()
         self.image = image # transformed image
         self.file_name = file_name
-        self.transforms = transforms # previous transforms
         self.previous = TransformList(transforms) # previous transforms
+        self.transformed = self.previous.apply_image(utils.read_image(self.file_name, format="BGR"))
 
     def apply_image(self, img: np.ndarray):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         try:
-            img = utils.read_image(self.file_name, format="BGR")
-            transformed = self.previous.apply_image(img)
             return self._invalidate_bbox()        
         except (AttributeError, NotImplementedError):
             return box
@@ -477,16 +595,29 @@ class AdjustBBTransform(Transform):
 # trained with classificator on images in bounding boxes
 class SimpleBBTransform(Transform):
 
-    def __init__(self, image: np.ndarray):
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
         super().__init__()
         self.image = image # transformed image
+        self.file_name = file_name
+        self.previous = TransformList(transforms) # previous transforms
+        self.transformed = self.previous.apply_image(utils.read_image(self.file_name, format="BGR"))
+        self.model = self._load_model()
+        self.transforms = torchvision.transforms.Compose([
+            torchvision.transforms.PILToTensor(),
+            torchvision.transforms.ConvertImageDtype(torch.float),
+            torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        self.count = 0
 
     def apply_image(self, img: np.ndarray):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         try:
-            return self._invalidate_bbox()        
+            if self._predict(self.image, box) < 0.1:
+                return self._invalidate_bbox()     
+            else:
+                return box   
         except (AttributeError, NotImplementedError):
             return box
             
@@ -496,8 +627,49 @@ class SimpleBBTransform(Transform):
     def apply_segmentation(self, segmentation):
         return segmentation
     
+    def _output(self, img):
+        filepath = os.path.join("tools/outputs", f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
+        self.count = self.count + 1
+        print("Saving to {} ...".format(filepath))
+        img.save(filepath)
+
+    def _load_model(self):
+        model = SimpleClassifier().to(0) # shift to GPU
+        model.load_state_dict(torch.load('randaug/data/classifier/vehicle_classifier.pth'))
+        model.eval()
+        return model
+    
+    def _predict(self, image, box):    
+        cropped = crop_and_pad(image, box)
+        #self._output(cropped)
+        cropped = self.transforms(cropped)
+        cropped = cropped.unsqueeze(0).to(0) # type: ignore
+        return torch.sigmoid(self.model(cropped))
+
     def _invalidate_bbox(self):
         return np.array([np.Infinity,
                          np.Infinity,
                          np.Infinity,
                          np.Infinity])
+    
+
+def crop_and_pad(image: np.ndarray, box):
+
+    def expand2square(pil_img, background_color):
+        width, height = pil_img.size
+        if width == height:
+            return pil_img
+        elif width > height:
+            result = Image.new(pil_img.mode, (width, width), background_color)
+            result.paste(pil_img, (0, (width - height) // 2))
+            return result
+        else:
+            result = Image.new(pil_img.mode, (height, height), background_color)
+            result.paste(pil_img, ((height - width) // 2, 0))
+            return result
+    
+    im = Image.fromarray(image)
+    im = im.crop(box[0])
+    im = expand2square(im, (0, 0, 0))
+    im = im.resize((224, 224))
+    return im
