@@ -27,6 +27,7 @@ from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.data import MetadataCatalog
 from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, hooks, launch
+from detectron2 import model_zoo
 from detectron2.evaluation import (
     CityscapesInstanceEvaluator,
     CityscapesSemSegEvaluator,
@@ -120,10 +121,7 @@ def setup(args):
     cfg = get_cfg()
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
-    cfg.DATALOADER.NUM_WORKERS = 0
-    cfg.rand_N = 2 # number of transforms
-    cfg.rand_M = 10 # magnitude of transforms
-    cfg.box_postprocessing = False
+    #cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml")
     cfg.freeze()
     default_setup(cfg, args)
     return cfg

@@ -9,18 +9,18 @@ from itertools import product
 
 
 gan_transforms = [ 
-    # "CycleGANFogAugmentation",
-    # "CycleGANRainAugmentation",
-    # "CycleGANSnowAugmentation",
-    # "CUTFogAugmentation",
-    # "CUTRainAugmentation",
-    # "CUTSnowAugmentation",
-    # "StableDiffusionFogAugmentation",
-    # "StableDiffusionRainAugmentation",
-    # "StableDiffusionSnowAugmentation",
-    # "CycleDiffusionFogAugmentation",
-    # "CycleDiffusionRainAugmentation",
-    # "CycleDiffusionSnowAugmentation"
+    "CycleGANFogAugmentation",
+    "CycleGANRainAugmentation",
+    "CycleGANSnowAugmentation",
+    "CUTFogAugmentation",
+    "CUTRainAugmentation",
+    "CUTSnowAugmentation",
+    "StableDiffusionFogAugmentation",
+    "StableDiffusionRainAugmentation",
+    "StableDiffusionSnowAugmentation",
+    "CycleDiffusionFogAugmentation",
+    "CycleDiffusionRainAugmentation",
+    "CycleDiffusionSnowAugmentation"
 ]
 
 image_transforms = [
@@ -29,7 +29,7 @@ image_transforms = [
     "ShearYAugmentation",
     "FogAugmentation",
     "SnowAugmentation",
-    "DropAugmentation",
+    #"DropAugmentation",
     "RainAugmentation",
     "TranslateXAugmentation",
     "TranslateYAugmentation",

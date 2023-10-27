@@ -3,6 +3,7 @@ from detectron2.engine import default_argument_parser, launch
 from randaug.engine import RandTrainer
 from randaug.engine.transform_sampler import TransformSampler
 from randaug.data import datasets
+from detectron2 import model_zoo
 
 
 def setup(args):
@@ -10,7 +11,8 @@ def setup(args):
     cfg.dataroot = args.dataroot
     cfg.merge_from_file("configs/faster_rcnn.yaml")
     cfg.eval_output = "./evaluation"
-    cfg.rand_N = 1 # number of transforms
+    #cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml")
+    cfg.rand_N = 2 # number of transforms
     cfg.rand_M = 4 # magnitude of transforms
     cfg.box_postprocessing = False
     return cfg
@@ -20,7 +22,7 @@ def main(args):
     cfg = setup(args)
     sampler = TransformSampler(cfg)
 
-    for augmentation in sampler.no_augmentation():
+    for augmentation in sampler.grid_search():
         trainer = RandTrainer(cfg, augmentation=augmentation) 
         trainer.resume_or_load(resume=args.resume)
         trainer.train()
