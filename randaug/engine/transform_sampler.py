@@ -29,7 +29,6 @@ image_transforms = [
     "ShearYAugmentation",
     "FogAugmentation",
     "SnowAugmentation",
-    #"DropAugmentation",
     "RainAugmentation",
     "TranslateXAugmentation",
     "TranslateYAugmentation",
@@ -42,14 +41,17 @@ image_transforms = [
     "ContrastAugmentation",
     "BrightnessAugmentation",
     "SharpnessAugmentation",
-    "CutoutAugmentation"
+    "CutoutAugmentation",
+    "DropAugmentation",
 ]
 
+NUM_DATASETS = 32
 
 class TransformSampler():
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, epochs):
         self.cfg = cfg
+        self.epochs = self._get_epochs(epochs)
         np.random.seed(42) # random seed is required for parallelisation to have same magnitudes on every process
 
     def _sample_transforms(self, N):
@@ -72,7 +74,7 @@ class TransformSampler():
     
     def _magnitude(self, m=None):
         if m == None:
-            return np.random.randint(1, 10)
+            return np.random.randint(1, 5)
         else:
             return m
         
@@ -99,14 +101,17 @@ class TransformSampler():
             if op[0][0] != op[1][0]:
                 filtered.append(op)
         return filtered
+    
+    def _get_epochs(self, epochs):
+        return int(epochs / NUM_DATASETS)
 
     def grid_search(self):
         ops = self._sample_augmentation(magnitude=self.cfg.rand_M)
         ops = self._filter_image_augmentations(ops)
-        print(len(ops))
         augs = [self._map_to_transforms(op) for op in ops]
         augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
-        return augs
+        print(f"Start from epoch: {self.epochs}")
+        return augs[self.epochs:]
     
     def random_search(self):
         ops = self._sample_augmentation(magnitude=None)
@@ -119,4 +124,18 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [CutoutAugmentation(magnitude=4)])]
+        return [RandomAugmentation(self.cfg, 1, [TranslateXAugmentation(magnitude=4)])]
+    
+    def sample_output(self, magnitude=0):
+        # amount of images
+        # magnitudes (1-5 or only 5)
+        # every gan + every image augmentation
+        # how many samples per augmentation
+        transforms = list(product(gan_transforms, image_transforms))
+        ops = []
+        for transform in transforms:
+            aug = [(t, self._magnitude(magnitude)) for t in transform]
+            ops.append(aug)
+        augs = [self._map_to_transforms(op) for op in ops]
+        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        return augs

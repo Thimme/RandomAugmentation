@@ -15,10 +15,9 @@ SOLVER:
   MAX_ITER: 1000
   GAMMA: 0.052
 DATASETS:
-  TRAIN: ("providentia_fog",)
-  #TRAIN: ("adverse_clear", "adverse_clear_addon_01",)
+  TRAIN: ("adverse_clear", "adverse_clear_addon_01",)
   TEST: ("adverse_fog", "adverse_rain", "adverse_snow", "dense_clear_day", "dense_light_fog_day", "dense_light_fog_night", "dense_fog_day", "dense_fog_night", "dense_rain", "dense_snow_day", "dense_snow_night", "dawn_fog", "dawn_sand", "dawn_rain", "dawn_snow", "nuscenes_clear", "nuscenes_rain", "bdd_clear", "bdd_rain", "bdd_snow", "cityscapes_clear", "cityscapes_fog01", "cityscapes_fog02", "cityscapes_fog03", "acdc_fog", "acdc_rain", "acdc_snow", "providentia_fog", "providentia_snow", "midjourney_snow", "midjourney_rain", "midjourney_fog",)
 DATALOADER:
-  NUM_WORKERS: 4
+  NUM_WORKERS: 1
 TEST:
   EVAL_PERIOD: 0

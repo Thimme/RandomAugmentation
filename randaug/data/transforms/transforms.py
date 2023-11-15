@@ -5,6 +5,8 @@ import torchvision.transforms
 import cv2
 import os
 import math
+import uuid
+from detectron2.utils import comm
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
@@ -28,7 +30,7 @@ class Augmentations(Enum):
     FOG = 'fog'
     RAIN = 'rain'
     SNOW = 'snow'
-    DROP = 'drop'
+    DROP = 'drops'
     SHEAR_X = 'shear_x'
     SHEAR_Y = 'shear_y'
     TRANSLATE_X = 'translate_x'
@@ -88,9 +90,10 @@ class DropAugmentation(T.Augmentation):
         super().__init__()
         self.name = Augmentations.DROP
         self.magnitude = magnitude
+        self.device = f'cuda:{comm.get_rank()}'
 
     def get_transform(self, image):
-        return WeatherTransform(name=str(self.name), severity=math.floor((self.magnitude+1)/2))
+        return WeatherTransform(name=str(self.name), severity=math.floor((self.magnitude+1)/2), device=self.device)
     
 
 class CycleGANFogAugmentation(T.Augmentation):
@@ -471,11 +474,11 @@ class RandomAugmentation():
     
     def get_transforms(self):
         if self.cfg.box_postprocessing == True:
-            return self._prepend_standard_transform() + self.augmentations + self._append_standard_transform()
+            return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
         else:
-            return self._prepend_standard_transform() + self.augmentations
+            return self.augmentations + self._append_standard_flip()
     
-    def _prepend_standard_transform(self):
+    def _append_standard_flip(self):
         aug = T.RandomFlip(prob=0.5)
         return [aug]
 
@@ -486,13 +489,14 @@ class RandomAugmentation():
 
 class WeatherTransform(Transform):
 
-    def __init__(self, name, severity):
+    def __init__(self, name, severity, device=None):
         super().__init__()
         self.name = name
         self.severity = severity
+        self.device = device
 
     def apply_image(self, img: np.ndarray):
-        corr_img = corrupt(image=img, severity=self.severity, corruption_name=self.name)
+        corr_img = corrupt(image=img, severity=self.severity, corruption_name=self.name, device=self.device)
         return corr_img
     
     def apply_coords(self, coords):
@@ -601,6 +605,7 @@ class SimpleBBTransform(Transform):
         self.file_name = file_name
         self.previous = TransformList(transforms) # previous transforms
         self.transformed = self.previous.apply_image(utils.read_image(self.file_name, format="BGR"))
+        self.device = f'cuda:{comm.get_rank()}'
         self.model = self._load_model()
         self.transforms = torchvision.transforms.Compose([
             torchvision.transforms.PILToTensor(),
@@ -628,20 +633,22 @@ class SimpleBBTransform(Transform):
         return segmentation
     
     def _output(self, img):
-        filepath = os.path.join("tools/outputs", f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
-        self.count = self.count + 1
+        filename = str(uuid.uuid4())
+        #filepath = os.path.join("tools/vehicles", f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
+        filepath = os.path.join("tools/vehicles", f'{filename}.jpg')
+        #self.count = self.count + 1
         print("Saving to {} ...".format(filepath))
         img.save(filepath)
 
     def _load_model(self):
-        model = SimpleClassifier().to(0) # shift to GPU
+        model = SimpleClassifier().to(self.device) # shift to GPU
         model.load_state_dict(torch.load('randaug/data/classifier/vehicle_classifier.pth'))
         model.eval()
         return model
     
     def _predict(self, image, box):    
         cropped = crop_and_pad(image, box)
-        #self._output(cropped)
+        self._output(cropped)
         cropped = self.transforms(cropped)
         cropped = cropped.unsqueeze(0).to(0) # type: ignore
         return torch.sigmoid(self.model(cropped))

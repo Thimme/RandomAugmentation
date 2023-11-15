@@ -13,14 +13,14 @@ def setup(args):
     cfg.eval_output = "./evaluation"
     #cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml")
     cfg.rand_N = 2 # number of transforms
-    cfg.rand_M = 4 # magnitude of transforms
+    cfg.rand_M = 3 # magnitude of transforms
     cfg.box_postprocessing = False
     return cfg
 
 
 def main(args):
     cfg = setup(args)
-    sampler = TransformSampler(cfg)
+    sampler = TransformSampler(cfg, epochs=args.epochs)
 
     for augmentation in sampler.grid_search():
         trainer = RandTrainer(cfg, augmentation=augmentation) 
@@ -31,6 +31,7 @@ def main(args):
 def add_arguments():
     parser = default_argument_parser()
     parser.add_argument("--dataroot", type=str, help="Specify the folder to all datasets")
+    parser.add_argument("--epochs", default=0, type=int, help="Type the line number in results.json to continue")
     return parser
 
 

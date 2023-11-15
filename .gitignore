@@ -163,3 +163,4 @@ cython_debug/
 evaluation/
 output/
 tools/outputs
+tools/vehicles
