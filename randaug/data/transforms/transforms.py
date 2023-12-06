@@ -6,11 +6,14 @@ import cv2
 import os
 import math
 import uuid
+import lpips
+from skimage.metrics import structural_similarity as ssim
+from math import log10, sqrt 
 from detectron2.utils import comm
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
-from fvcore.transforms.transform import Transform, TransformList
+from fvcore.transforms.transform import Transform, TransformList, NoOpTransform
 from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from randaug.data.classifier.classifier import SimpleClassifier
@@ -453,6 +456,8 @@ class BoundingboxAugmentation(T.Augmentation):
             return SimpleBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'adjust':
             return AdjustBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'similarity':
+            return SimilarityBBTransform(image=image, file_name=file_name, transforms=transforms)
         else:
             return NotImplementedError
     
@@ -483,7 +488,7 @@ class RandomAugmentation():
         return [aug]
 
     def _append_standard_transform(self):
-        aug = BoundingboxAugmentation(algorithm='invalidate')
+        aug = BoundingboxAugmentation(algorithm='similarity')
         return [aug]
     
 
@@ -532,24 +537,42 @@ class GANTransform(Transform):
 
 # Bounding box transforms
 
+def PSNR(original, compressed): 
+    mse = np.mean((original - compressed) ** 2) 
+    if(mse == 0):  # MSE is zero means no noise is present in the signal . 
+                  # Therefore PSNR have no importance. 
+        return 100
+    max_pixel = 255.0
+    psnr = 20 * log10(max_pixel / sqrt(mse)) 
+    return psnr 
+
 # Invalidate bounding box depending on difference to orignal rectangle
-class InvalidateBBTransform(Transform):
+class SimilarityBBTransform(Transform):
 
     def __init__(self, image: np.ndarray, file_name: str, transforms: list):
         super().__init__()
-        self.image = image
+        self.image = image # transformed image
         self.file_name = file_name
-        self.previous = TransformList(transforms) # previous transforms
-        self.transformed = self.previous.apply_image(utils.read_image(self.file_name, format="BGR"))
+        self.original = np.array(Image.open(self.file_name))
+        self.transforms = transforms[-1] # previous transforms
+        self.original = self._apply_transforms(self.original, self.transforms)
+        self.image = utils.convert_image_to_rgb(self.image, 'BGR')
+        self.device = f'cuda:{comm.get_rank()}'
+        self.loss_fn = lpips.LPIPS(net='alex').to(self.device)
+        self.count = 0
 
     def apply_image(self, img: np.ndarray):
+
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         try:
-            return self._invalidate_bbox()
+            if self._compare_ssim(box=box) > 0.5:
+                return self._invalidate_bbox()     
+            else:
+                return box
         except (AttributeError, NotImplementedError):
-            return box  
+            return box
             
     def apply_coords(self, coords):
         return coords
@@ -557,6 +580,45 @@ class InvalidateBBTransform(Transform):
     def apply_segmentation(self, segmentation):
         return segmentation
     
+    def _apply_transforms(self, img, transform):
+        if isinstance(transform, NoOpTransform):
+            return img
+        else:
+            return TransformList([transform]).apply_image(img)
+
+    def _compare_lpips(self, box):    
+        cropped0 = crop_and_pad(self.image, box)
+        cropped1 = crop_and_pad(self.original, box)
+        self._output("tools/lpips_augmented", cropped0)
+        self._output("tools/lpips_original", cropped1)
+        img0 = lpips.im2tensor(np.array(cropped0)).to(self.device)
+        img1 = lpips.im2tensor(np.array(cropped1)).to(self.device)
+        dist0 = self.loss_fn.forward(img0, img1)
+        print(f'LPIPS for filename: {self.file_name.split("/")[-1]}: {dist0.item()}')
+        return dist0.item()
+    
+    def _compare_psnr(self, box):    
+        cropped0 = crop_and_pad(self.image, box)
+        cropped1 = crop_and_pad(self.original, box)
+        dist = PSNR(np.array(cropped0), np.array(cropped1))
+        print(f'PSNR for filename: {self.file_name.split("/")[-1]}: {dist}')
+        return dist
+    
+    def _compare_ssim(self, box):
+        cropped0 = np.array(crop_and_pad(self.image, box))
+        cropped1 = np.array(crop_and_pad(self.original, box))
+        cropped0 = cv2.cvtColor(cropped0, cv2.COLOR_RGB2GRAY)
+        cropped1 = cv2.cvtColor(cropped1, cv2.COLOR_RGB2GRAY)
+        dist = ssim(cropped0, cropped1)
+        print(f'SSIM for filename: {self.file_name.split("/")[-1]}: {dist}')
+        return dist
+    
+    def _output(self, path, img):
+        filepath = os.path.join(path, f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
+        self.count = self.count + 1
+        print("Saving to {} ...".format(filepath))
+        img.save(filepath)
+
     def _invalidate_bbox(self):
         return np.array([np.Infinity,
                          np.Infinity,
@@ -603,8 +665,12 @@ class SimpleBBTransform(Transform):
         super().__init__()
         self.image = image # transformed image
         self.file_name = file_name
-        self.previous = TransformList(transforms) # previous transforms
-        self.transformed = self.previous.apply_image(utils.read_image(self.file_name, format="BGR"))
+        self.transforms = TransformList(transforms) # previous transforms
+        self.original = Image.fromarray(image)
+        self.transformed = self.transforms.apply_image(utils.read_image(self.file_name))
+        #self.transformed = utils.convert_image_to_rgb(self.transformed, "BGR")
+        #Image.fromarray(self.transformed).save(f'tools/transformed/{self.file_name.split("/")[-1]}_transformed.jpg')
+        #self.original.save(f'tools/transformed/{self.file_name.split("/")[-1]}_original.jpg')
         self.device = f'cuda:{comm.get_rank()}'
         self.model = self._load_model()
         self.transforms = torchvision.transforms.Compose([
@@ -619,10 +685,10 @@ class SimpleBBTransform(Transform):
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         try:
-            if self._predict(self.image, box) < 0.1:
+            if self._predict(self.image, box) < 0.4:
                 return self._invalidate_bbox()     
             else:
-                return box   
+                return box
         except (AttributeError, NotImplementedError):
             return box
             
@@ -634,9 +700,9 @@ class SimpleBBTransform(Transform):
     
     def _output(self, img):
         filename = str(uuid.uuid4())
-        #filepath = os.path.join("tools/vehicles", f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
-        filepath = os.path.join("tools/vehicles", f'{filename}.jpg')
-        #self.count = self.count + 1
+        filepath = os.path.join("tools/test_vehicles", f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
+        #filepath = os.path.join("tools/vehicles", f'{filename}.jpg')
+        self.count = self.count + 1
         print("Saving to {} ...".format(filepath))
         img.save(filepath)
 

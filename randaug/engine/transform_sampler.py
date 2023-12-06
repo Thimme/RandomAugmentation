@@ -124,7 +124,7 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [TranslateXAugmentation(magnitude=4)])]
+        return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=4), ColorAugmentation(magnitude=4)])]
     
     def sample_output(self, magnitude=0):
         # amount of images

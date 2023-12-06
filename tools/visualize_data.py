@@ -76,7 +76,7 @@ if __name__ == "__main__":
     scale = 1.0
     if args.source == "dataloader":
         sampler = TransformSampler(cfg, epochs=0)
-        transforms = sampler.random_search()
+        transforms = sampler.test()
         train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=transforms[0].get_transforms())
         for batch in train_data_loader:
             for per_image in batch:

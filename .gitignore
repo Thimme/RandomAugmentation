@@ -164,3 +164,7 @@ evaluation/
 output/
 tools/outputs
 tools/vehicles
+tools/lpips_augmented/
+tools/lpips_original/
+tools/test_vehicles/
+tools/transformed/
