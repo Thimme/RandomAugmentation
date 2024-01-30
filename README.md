@@ -7,6 +7,18 @@ Install the conda environment from yml file. Python 3.8 is used in this project.
 conda env create -f environment.yml
 ```
 
+Activate the conda environment running the following command.
+
+```
+conda activate detectron
+```
+
+To install detectron in your conda environment
+
+```
+python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
+```
+
 ## Run
 To run the code first activate the conda environment.
 
