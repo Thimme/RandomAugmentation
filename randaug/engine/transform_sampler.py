@@ -9,18 +9,18 @@ from itertools import product
 
 
 gan_transforms = [ 
-    "CycleGANFogAugmentation",
-    "CycleGANRainAugmentation",
-    "CycleGANSnowAugmentation",
-    "CUTFogAugmentation",
-    "CUTRainAugmentation",
-    "CUTSnowAugmentation",
-    "StableDiffusionFogAugmentation",
-    "StableDiffusionRainAugmentation",
-    "StableDiffusionSnowAugmentation",
-    "CycleDiffusionFogAugmentation",
-    "CycleDiffusionRainAugmentation",
-    "CycleDiffusionSnowAugmentation"
+    # "CycleGANFogAugmentation",
+    # "CycleGANRainAugmentation",
+    # "CycleGANSnowAugmentation",
+    # "CUTFogAugmentation",
+    # "CUTRainAugmentation",
+    # "CUTSnowAugmentation",
+    # "StableDiffusionFogAugmentation",
+    # "StableDiffusionRainAugmentation",
+    # "StableDiffusionSnowAugmentation",
+    # "CycleDiffusionFogAugmentation",
+    # "CycleDiffusionRainAugmentation",
+    # "CycleDiffusionSnowAugmentation"
 ]
 
 image_transforms = [
@@ -81,6 +81,7 @@ class TransformSampler():
     def _filter_image_augmentations(self, ops):
         filtered = self._filter_gan_augmentations(ops)
         filtered = self._filter_duplicates(filtered)
+        filtered = self._filter_non_weather(filtered)
         return filtered
     
     def _filter_gan_augmentations(self, ops):
@@ -99,6 +100,16 @@ class TransformSampler():
         filtered = []
         for op in ops:
             if op[0][0] != op[1][0]:
+                filtered.append(op)
+        return filtered
+    
+    def _filter_non_weather(self, ops):
+        weather = ["FogAugmentation", "SnowAugmentation", "RainAugmentation", "DropAugmentation"]
+        if len(ops[0]) <= 1:
+            return ops
+        filtered = []
+        for op in ops:
+            if op[0][0] in weather or op[1][0] in weather:
                 filtered.append(op)
         return filtered
     
