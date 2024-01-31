@@ -23,6 +23,21 @@ gan_transforms = [
     # "CycleDiffusionSnowAugmentation"
 ]
 
+diffusion_transforms = [
+    "CycleDiffusionFogAugmentation",
+    "CycleDiffusionRainAugmentation",
+    "CycleDiffusionSnowAugmentation",
+    "StableDiffusionFogAugmentation",
+    "StableDiffusionRainAugmentation",
+    "StableDiffusionSnowAugmentation",
+    "PlugPlayFogAugmentation",
+    "PlugPlayRainAugmentation",
+    "PlugPlaySnowAugmentation",
+    "ControlNetFogAugmentation",
+    "ControlNetRainAugmentation",
+    "ControlNetSnowAugmentation",
+]
+
 image_transforms = [
     "ColorAugmentation",
     "ShearXAugmentation",
@@ -69,6 +84,13 @@ class TransformSampler():
         for transform in transforms:
             aug = [(t, self._magnitude(magnitude)) for t in transform]
             augs.append(aug)
+
+        return augs
+    
+    def _sample_diffusion_models(self, ids=[]):
+        augs = []
+        for transform in diffusion_transforms:
+            _ = [augs.append([(transform, id)]) for id in ids]
 
         return augs
     
@@ -130,12 +152,19 @@ class TransformSampler():
         augs = [self._map_to_transforms(op) for op in ops]
         augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
         return augs
+
+    def diffusion_search(self):
+        ops = self._sample_diffusion_models(ids=[1, 2, 3, 4, 5])
+        augs = [self._map_to_transforms(op) for op in ops] 
+        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        print(augs)
+        return augs
     
     def no_augmentation(self):
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=4), ColorAugmentation(magnitude=4)])]
+        return [RandomAugmentation(self.cfg, 1, [RotationAugmentation(magnitude=0), ColorAugmentation(magnitude=4)])]
     
     def sample_output(self, magnitude=0):
         # amount of images

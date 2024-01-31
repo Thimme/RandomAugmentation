@@ -21,8 +21,10 @@ class Augmentations(Enum):
 
     CYCLE_GAN = 'cyclegan'
     CUT = 'cut'
-    CYCLE_DIFFUSION = 'cyclediffusion'
-    STABLE_DIFFUSION = 'stablediffusion'
+    CYCLE_DIFFUSION = 'cycle_diffusion'
+    STABLE_DIFFUSION = 'stable_diffusion'
+    PLUG_DIFFUSION = 'plugplay_diffusion'
+    CONTROL_DIFFUSION = 'control_diffusion'
     FOG = 'fog'
     RAIN = 'rain'
     SNOW = 'snow'
@@ -229,6 +231,81 @@ class StableDiffusionSnowAugmentation(T.Augmentation):
     def __init__(self, magnitude=1):
         super().__init__()
         self.name = Augmentations.STABLE_DIFFUSION
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+
+
+# TODO: Create new diffusion models here
+#   
+
+class PlugPlayFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.PLUG_DIFFUSION
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class PlugPlayRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.PLUG_DIFFUSION
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class PlugPlaySnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.PLUG_DIFFUSION
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+
+
+class ControlNetFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CONTROL_DIFFUSION
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class ControlNetRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CONTROL_DIFFUSION
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+    
+
+class ControlNetSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1):
+        super().__init__()
+        self.name = Augmentations.CONTROL_DIFFUSION
         self.weather = Augmentations.SNOW
         self.magnitude = magnitude
 
@@ -511,13 +588,13 @@ class GANTransform(Transform):
         super().__init__()
         self.name = network
         self.weather = weather
-        self.severity = severity
+        self.severity = severity # severity is used as ID
         self.file_path = file_path
 
     def apply_image(self, img: np.ndarray):
         filename = self.file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format="BGR")

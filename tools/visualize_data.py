@@ -28,7 +28,7 @@ def setup(args):
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.rand_N = 2 # number of transforms
     cfg.rand_M = 5 # magnitude of transforms
-    cfg.box_postprocessing = True
+    cfg.box_postprocessing = False
     cfg.freeze()
     return cfg
 

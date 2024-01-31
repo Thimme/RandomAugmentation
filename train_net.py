@@ -22,7 +22,7 @@ def main(args):
     cfg = setup(args)
     sampler = TransformSampler(cfg, epochs=args.epochs)
 
-    for augmentation in sampler.grid_search():
+    for augmentation in sampler.diffusion_search():
         trainer = RandTrainer(cfg, augmentation=augmentation) 
         trainer.resume_or_load(resume=args.resume)
         trainer.train()
