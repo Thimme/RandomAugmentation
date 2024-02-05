@@ -82,12 +82,18 @@ class SnowAugmentation(T.Augmentation):
 # run on GPU
 class DropAugmentation(T.Augmentation):
 
-    def __init__(self, magnitude=1):
+    def __init__(self, magnitude=1, device=None):
         super().__init__()
         self.name = Augmentations.DROP
         self.magnitude = magnitude
-        self.device = f'cuda:{comm.get_rank()}'
+        self.device = self._get_device(device)
 
+    def _get_device(self, device):
+        if device is None:
+            return f'cuda:{comm.get_rank()}'
+        else:
+            return device
+        
     def get_transform(self, image):
         return WeatherTransform(name=str(self.name), severity=self.magnitude, device=self.device)
     

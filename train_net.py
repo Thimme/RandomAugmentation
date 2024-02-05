@@ -14,18 +14,34 @@ def setup(args):
     #cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml")
     cfg.rand_N = 1 # number of transforms
     cfg.rand_M = 4 # magnitude of transforms
+    cfg.rand_augment = True
     cfg.box_postprocessing = False
     return cfg
 
 
+# def main(args):
+#     cfg = setup(args)
+#     sampler = TransformSampler(cfg, epochs=args.epochs)
+
+#     for augmentation in sampler.grid_search():
+#         trainer = RandTrainer(cfg, augmentation=augmentation) 
+#         trainer.resume_or_load(resume=args.resume)
+#         trainer.train()
+
+
 def main(args):
     cfg = setup(args)
-    sampler = TransformSampler(cfg, epochs=args.epochs)
+    
+    # Iterate over a range of values for rand_N and rand_M to configure and train the RandTrainer
+    for rand_N_value in range(3, 4):  # Looping from 1 to 3 for rand_N
+        for rand_M_value in range(5):  # Looping from 0 to 4 for rand_M
+            # Set the configuration parameters
+            cfg.rand_N = rand_N_value
+            cfg.rand_M = rand_M_value
 
-    for augmentation in sampler.grid_search():
-        trainer = RandTrainer(cfg, augmentation=augmentation) 
-        trainer.resume_or_load(resume=args.resume)
-        trainer.train()
+            trainer = RandTrainer(cfg, augmentation=None)
+            trainer.resume_or_load(resume=args.resume)
+            trainer.train()
 
 
 def add_arguments():

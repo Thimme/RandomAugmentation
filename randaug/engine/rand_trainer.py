@@ -25,7 +25,8 @@ from detectron2.evaluation import (
 
 from randaug.data.transforms import transforms as W
 from randaug.utils.results_writer import JSONResultsWriter
-from randaug.data.dataset_mapper import MyDatasetMapper
+from randaug.data.dataset_mapper import MyDatasetMapper, RandAugmentDatasetMapper
+from randaug.engine.transform_sampler import RandomSampler
 
 
 class RandTrainer(TrainerBase):
@@ -47,8 +48,14 @@ class RandTrainer(TrainerBase):
         # Assume these objects must be constructed in this order.
         model = self.build_model(cfg)
         optimizer = self.build_optimizer(cfg, model)
-        data_loader = self.build_train_loader(cfg, augmentation.get_transforms())
-        
+
+        if augmentation == None:
+            data_loader = self.build_rand_augment_train_loader(cfg)
+            self.rand_aug = f"{cfg.rand_N}-{cfg.rand_M}"
+        else:
+            data_loader = self.build_train_loader(cfg, augmentation.get_transforms())
+            self.rand_aug = augmentation
+
         model = create_ddp_model(model, broadcast_buffers=False)
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
             model, data_loader, optimizer
@@ -64,7 +71,6 @@ class RandTrainer(TrainerBase):
         self.start_iter = 0
         self.max_iter = cfg.SOLVER.MAX_ITER
         self.cfg = cfg
-        self.rand_aug = augmentation
         self.register_hooks(self.build_hooks())
 
     def resume_or_load(self, resume=True):
@@ -198,7 +204,12 @@ class RandTrainer(TrainerBase):
     
     @classmethod
     def build_train_loader(cls, cfg, transforms):
-        mapper = MyDatasetMapper(cfg, is_train=True, augmentations=transforms)
+        mapper = MyDatasetMapper(cfg, is_train=True, augmentations=transforms) # type: ignore
+        return build_detection_train_loader(cfg, mapper=mapper)
+    
+    @classmethod
+    def build_rand_augment_train_loader(cls, cfg):
+        mapper = RandAugmentDatasetMapper(cfg, is_train=True, sampler=RandomSampler(device=f'cuda:{comm.get_rank()}')) # type: ignore
         return build_detection_train_loader(cfg, mapper=mapper)
     
     @classmethod

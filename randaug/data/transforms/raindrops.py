@@ -10,6 +10,8 @@ import cv2
 from PIL import Image
 from torchvision.transforms import ToTensor, ToPILImage
 from math import floor, ceil
+import gc
+
 
 class DropModel:
     def __init__(self,
@@ -94,11 +96,12 @@ class DropModel:
 
     def get_drop_stock(self, numdrops):
 
+        #print(f"numdrops: {numdrops} - device: {self.device}")
         single_drop = self.single_drop.repeat(numdrops, 1, 1)
         single_drop = single_drop.view(numdrops, -1, 2)
 
-        #noise = torch.rand(numdrops, 3, int(self.drop_size / self.noise_resize), int(self.drop_size / self.noise_resize)).to(self.device)
-        noise = torch.rand(numdrops, 3, int(self.drop_size / self.noise_resize), int(self.drop_size / self.noise_resize)).to(self.device)      
+        #noise = torch.rand(dtype=torch.float16, numdrops, 3, int(self.drop_size / self.noise_resize), int(self.drop_size / self.noise_resize)).to(self.device)
+        noise = torch.rand(numdrops, 3, int(self.drop_size / self.noise_resize), int(self.drop_size / self.noise_resize), dtype=torch.float16).to(self.device)      
         noise = F.interpolate(noise, size = (self.drop_size, self.drop_size), mode = 'bilinear')
         noise = noise.view(numdrops, 3, -1).permute(0, 2, 1)
         n = noise[:, :, 2].unsqueeze(-1)
@@ -116,7 +119,7 @@ class DropModel:
         v = v.permute(0, 2, 1)
         v[:, 2, :] = random.uniform(self.min_thickness, self.max_thickness)
         v = v.view(numdrops, 3, self.drop_size, self.drop_size)
-        mask = (t > self.shape_threshold).float()
+        mask = (t > self.shape_threshold).to(dtype=torch.float16)
         mask = mask.view(numdrops, 1, self.drop_size, self.drop_size)
 
         return torch.cat((v * mask, mask), dim = 1)
@@ -149,10 +152,11 @@ class DropModel:
         sizes = (torch.tensor(self.imsize).to(self.device) / numsquares).min(dim = 1)[0].long()
 
         return sizes
+    
 
     def blend(self, t):
         # average over dim zero but only on nonzero coordinates nonzero
-        nonzero_mask = (t != 0).float()
+        nonzero_mask = (t != 0)
         nonzero_count = nonzero_mask.sum(dim = 0)
         nonzero_count[nonzero_count == 0] = 1
         return t.sum(dim = 0) / nonzero_count
@@ -165,68 +169,64 @@ class DropModel:
     
 
     def get_normal_map(self):
-        numdrops = self.get_numdrops() / 1.7 # reduce drops to reduce memory overhead on gpus (1.7 - 1.8)
+        numdrops = self.get_numdrops() / 1.5 # reduce drops to reduce memory overhead on gpus (1.7 - 1.8)
         numdrops_total = int(numdrops.sum().item())
         drops_sizes = self.get_drops_sizes()
-        drops_stock = self.get_drop_stock(numdrops_total)
+        #drops_stock = self.get_drop_stock(numdrops_total).to(dtype=torch.float16)
 
-        #rand_y = torch.randint(- int(self.imsize[0] / 2), int(self.imsize[0] / 2), size = (numdrops_total, 1)).to(self.device)
-        #rand_x = torch.randint(- int(self.imsize[1] / 2), int(self.imsize[1] / 2) , size = (numdrops_total, 1)).to(self.device)
         rand_y = torch.randint(- int(self.imsize[0] / 2), int(self.imsize[0] / 2), size = (numdrops_total, 1)).to(self.device)
         rand_x = torch.randint(- int(self.imsize[1] / 2), int(self.imsize[1] / 2) , size = (numdrops_total, 1)).to(self.device)
-        offsets = torch.cat((rand_x, rand_y), dim = 1).float()
+        offsets = torch.cat((rand_x, rand_y), dim = 1).to(dtype=torch.float16)
 
-       #dropmap = torch.zeros(1, 3, self.imsize[0], self.imsize[1]).to(self.device)
-        #maskmap = torch.zeros(1, 1, self.imsize[0], self.imsize[1]).to(self.device)
-        dropmap = torch.zeros(1, 3, self.imsize[0], self.imsize[1]).to(self.device)
-        maskmap = torch.zeros(1, 1, self.imsize[0], self.imsize[1]).to(self.device)
+        dropmap = torch.zeros(1, 3, self.imsize[0], self.imsize[1], dtype=torch.float16).to(self.device)
+        maskmap = torch.zeros(1, 1, self.imsize[0], self.imsize[1], dtype=torch.float16).to(self.device)
 
-        drops = torch.zeros(1, 3, self.imsize[0], self.imsize[1]).to(self.device)
-        masks = torch.zeros(1, 1, self.imsize[0], self.imsize[1]).to(self.device)
+        drops = torch.zeros(1, 3, self.imsize[0], self.imsize[1], dtype=torch.float16).to(self.device)
+        masks = torch.zeros(1, 1, self.imsize[0], self.imsize[1], dtype=torch.float16).to(self.device)
 
         for layer_id in range(0, self.r.size(0)):
             # Get the drops and resize them to the desired size
             startindex = numdrops[:layer_id].sum().long().item()
             endindex = numdrops[:layer_id + 1].sum().long().item()
-            step = 10
-
             layer_size = drops_sizes[layer_id].long().item()
-            drops_layer = drops_stock[startindex:endindex]
-            drops_layer = F.interpolate(drops_layer, size = (layer_size, layer_size), mode = 'bilinear')
-            offsets_layer = offsets[startindex:endindex]
+            # drops_layer = drops_stock[startindex:endindex]
             
-            for i in range(0, endindex - startindex, step):
-                start = i
-                end = i + step
-                if end >= endindex:
-                    end = endindex
+            # Padding
+            pad_value_left = floor((self.imsize[0] - layer_size) / 2)
+            pad_value_right = ceil((self.imsize[0] - layer_size) / 2)
+            pad_value_top = floor((self.imsize[1] - layer_size) / 2)
+            pad_value_bottom = ceil((self.imsize[1] - layer_size) / 2)
+            
+            # Process in smaller batches
+            batch_size = 25  # Adjust based on GPU memory
+            for start in range(startindex, endindex, batch_size): # type: ignore
+                end = min(start + batch_size, endindex)
+                batch_size = end - start
+                drops_batch = self.get_drop_stock(batch_size).to(dtype=torch.float16)
 
-                # Padding
-                pad_value_left = floor((self.imsize[0] - layer_size) / 2)
-                pad_value_right = ceil((self.imsize[0] - layer_size) / 2)
-                pad_value_top = floor((self.imsize[1] - layer_size) / 2)
-                pad_value_bottom = ceil((self.imsize[1] - layer_size) / 2)
+                # Apply transformations
+                drops_batch = F.interpolate(drops_batch, size=(layer_size, layer_size), mode='bilinear')
+                drops_batch = F.pad(drops_batch, (pad_value_top, pad_value_bottom, pad_value_left, pad_value_right), value=0)
+                drops_batch = kornia.geometry.transform.translate(drops_batch, offsets[start:end])
 
-                drops_layer_split = F.pad(drops_layer[start:end], (pad_value_top, pad_value_bottom, pad_value_left, pad_value_right), value=0)
-
-                # random displacement TODO: this one can be parallelized if we concat the images
-                drops_layer_split = kornia.geometry.transform.translate(drops_layer_split, offsets_layer[start:end])
-
-                # return to -1, 1 encoding
-                masks_layer_split = drops_layer_split[:, 3].unsqueeze(1)
-                drops_layer_split = drops_layer_split[:, :3]
+                masks_batch = drops_batch[:, 3].unsqueeze(1)
+                drops_batch = drops_batch[:, :3]
 
                 # Getting a single displacement map
-                drops_concat = torch.cat((drops, drops_layer_split), 0)
-                masks_concat = torch.cat((masks, masks_layer_split), 0)
+                drops_concat = torch.cat((drops, drops_batch), 0)
+                masks_concat = torch.cat((masks, masks_batch), 0)
 
                 drops = self.blend(drops_concat).unsqueeze(0)
                 masks = self.blend(masks_concat).unsqueeze(0)
+
+                del masks_batch, drops_batch
+                torch.cuda.empty_cache()
         
         dropmap[dropmap == 0] = drops[dropmap == 0]
         maskmap[maskmap == 0] = masks[maskmap == 0]
 
         return dropmap.permute(0, 2, 3, 1).view(1, self.imsize[0] * self.imsize[1], 3), maskmap.permute(0, 2, 3, 1).view(1, self.imsize[0] * self.imsize[1], 1)
+
 
     def get_noise(self):
         #noise = torch.rand(self.r.size(0), 3, self.noise_h, self.noise_w).to(self.device)
@@ -280,11 +280,10 @@ class DropModel:
         im = (im_refracted * mask * transparency) + im * (1 - (mask * transparency))
         
         if return_drops:
-           #mask_binary = torch.zeros(mask.size()).to(self.device)
             mask_binary = torch.zeros(mask.size()).to(self.device)
             mask_binary[mask > 0] = 1
             return im, mask_binary
-
+        
         return im
     
 
