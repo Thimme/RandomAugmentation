@@ -7,20 +7,35 @@ from randaug.data.transforms.transforms import *
 
 from itertools import product
 
-
-gan_transforms = [ 
+gan_transforms = [
     "CycleGANFogAugmentation",
     "CycleGANRainAugmentation",
     "CycleGANSnowAugmentation",
     "CUTFogAugmentation",
     "CUTRainAugmentation",
     "CUTSnowAugmentation",
+]
+
+diffusion_transforms = [
     "StableDiffusionFogAugmentation",
     "StableDiffusionRainAugmentation",
     "StableDiffusionSnowAugmentation",
     "CycleDiffusionFogAugmentation",
     "CycleDiffusionRainAugmentation",
-    "CycleDiffusionSnowAugmentation"
+    "CycleDiffusionSnowAugmentation",
+]
+
+ai_transforms = [
+    "CycleGAN",
+    "CUT",
+    "StableDiffusion",
+    "CycleDiffusion",
+]
+
+ai_conditions = [
+    "FogAugmentation",
+    "RainAugmentation",
+    "SnowAugmentation",
 ]
 
 image_transforms = [
@@ -32,10 +47,9 @@ image_transforms = [
     "RainAugmentation",
     "TranslateXAugmentation",
     "TranslateYAugmentation",
-    "RotationAugmentation",
     "AutoContrastAugmentation",
     "InvertAugmentation",
-    "EqualizeAugmentation",
+    "EqualizeAugmentation", #
     "SolarizeAugmentation",
     "PosterizeAugmentation",
     "ContrastAugmentation",
@@ -43,6 +57,7 @@ image_transforms = [
     "SharpnessAugmentation",
     "CutoutAugmentation",
     "DropAugmentation",
+    "RotationAugmentation",
 ]
 
 NUM_DATASETS = 32
@@ -55,7 +70,7 @@ class TransformSampler():
         np.random.seed(42) # random seed is required for parallelisation to have same magnitudes on every process
 
     def _sample_transforms(self, N):
-        return [t for t in product(gan_transforms + image_transforms, repeat = N)]
+        return [t for t in product(gan_transforms + diffusion_transforms + image_transforms, repeat = N)]
         
     def _map_to_transforms(self, ops):
         transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
@@ -90,7 +105,7 @@ class TransformSampler():
         filtered = []
         for op in ops:
             second_aug = op[1][0]
-            if second_aug not in gan_transforms:
+            if second_aug not in gan_transforms + diffusion_transforms:
                 filtered.append(op)
         return filtered
 
@@ -135,7 +150,7 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [DropAugmentation(magnitude=4), ColorAugmentation(magnitude=4)])]
+        return [RandomAugmentation(self.cfg, 1, [ShearYAugmentation(magnitude=4), ColorAugmentation(magnitude=4)])]
     
     def sample_output(self, magnitude=0):
         # amount of images
@@ -158,8 +173,8 @@ class RandomSampler():
         self.device = device
 
     def _sample_ops(self, N):
-        transforms = gan_transforms + image_transforms
-        one_time = gan_transforms # ["DropAugmentation"]
+        transforms = ai_transforms + image_transforms
+        one_time = ai_transforms # ["DropAugmentation"]
 
         while True:
             # Sample elements from A
@@ -169,7 +184,15 @@ class RandomSampler():
 
             # It does not make sense to have more than one gan / diffusion transform as it replaces the rest of the augmentations
             if gan_count <= 1:
+                sampled = [self._replace_sample(s) for s in sampled]
                 return sampled
+            
+    def _replace_sample(self, sample):
+        if sample in ai_transforms:
+            condition = random.choice(ai_conditions)
+            return f"{sample}{condition}"
+        else:
+            return sample
     
     def _add_magnitude(self, ops, M):
         magnitude = M
@@ -199,7 +222,7 @@ class RandomSampler():
 
     def random_augmentation(self, N, M):
         ops = self._sample_ops(N)
-        ops = self._reorder_ops(ops, gan_transforms)
+        ops = self._reorder_ops(ops, gan_transforms + diffusion_transforms)
         ops = self._add_magnitude(ops, M)
         transforms, _ = self._map_to_transforms(ops)
         return transforms

@@ -2,6 +2,7 @@ import numpy as np
 import albumentations as A
 import os
 import math
+import random
 from detectron2.utils import comm
 from PIL import ImageOps, ImageEnhance
 from detectron2.data import transforms as T
@@ -44,6 +45,11 @@ class Augmentations(Enum):
     SHARPNESS = 'sharpness'
     CUTOUT = 'cutout'
 
+def random_invert(number):
+    if random.choice([True, False]):
+        return -number
+    else:
+        return number
 
 # Own augmentations
 class FogAugmentation(T.Augmentation):
@@ -253,7 +259,8 @@ class ShearXAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(-20, 20, num=MAGNITUDE_BINS) # Shear in degrees 
+        v = np.linspace(5, 25, num=MAGNITUDE_BINS) # Shear in degrees 
+        v = random_invert(number=v)
         transform = A.Affine(shear={'x': v[self.magnitude], 'y': 0})
         params = prepare_param(transform, image)
         return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
@@ -267,7 +274,8 @@ class ShearYAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(-20, 20, num=MAGNITUDE_BINS) # Shear in degrees 
+        v = np.linspace(5, 25, num=MAGNITUDE_BINS) # Shear in degrees 
+        v = random_invert(number=v)
         transform = A.Affine(shear={'x': 0, 'y': v[self.magnitude]})
         params = prepare_param(transform, image)
         return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
@@ -281,7 +289,8 @@ class TranslateXAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image): 
-        v = np.linspace(-0.45, 0.45, num=MAGNITUDE_BINS)
+        v = np.linspace(0.1, 0.45, num=MAGNITUDE_BINS)
+        v = random_invert(number=v)
         transform = A.Affine(translate_percent={'x': v[self.magnitude], 'y': 0})
         params = prepare_param(transform, image)
         return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
@@ -295,7 +304,8 @@ class TranslateYAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        v = np.linspace(-0.45, 0.45, num=MAGNITUDE_BINS)
+        v = np.linspace(0.1, 0.45, num=MAGNITUDE_BINS)
+        v = random_invert(number=v)
         transform = A.Affine(translate_percent={'x': 0, 'y': v[self.magnitude]})
         params = prepare_param(transform, image)
         return AlbumentationsTransform(transform, params, size=(image.shape[:2]))  
@@ -310,9 +320,12 @@ class RotationAugmentation(T.Augmentation):
         self.magnitude = magnitude
         
     def get_transform(self, image):
-        h, w = image.shape[:2]
-        angle = np.linspace(-30, 30, num=MAGNITUDE_BINS)
-        return T.RotationTransform(h, w, angle[self.magnitude])
+        angle = np.linspace(5, 30, num=MAGNITUDE_BINS)
+        angle = random_invert(number=angle)
+        transform = A.Affine(rotate=angle[self.magnitude])
+        params = prepare_param(transform, image)
+        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))  
+        #return T.RotationTransform(h, w, angle[self.magnitude])
     
 
 class AutoContrastAugmentation(T.Augmentation):

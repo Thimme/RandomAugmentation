@@ -34,7 +34,7 @@ def main(args):
     
     # Iterate over a range of values for rand_N and rand_M to configure and train the RandTrainer
     for rand_N_value in range(3, 4):  # Looping from 1 to 3 for rand_N
-        for rand_M_value in range(5):  # Looping from 0 to 4 for rand_M
+        for rand_M_value in range(4, 5):  # Looping from 0 to 4 for rand_M
             # Set the configuration parameters
             cfg.rand_N = rand_N_value
             cfg.rand_M = rand_M_value
