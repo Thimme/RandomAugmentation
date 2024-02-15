@@ -8,21 +8,25 @@ from randaug.data.transforms.transforms import *
 from itertools import product
 
 gan_transforms = [
-    "CycleGANFogAugmentation",
-    "CycleGANRainAugmentation",
-    "CycleGANSnowAugmentation",
-    "CUTFogAugmentation",
-    "CUTRainAugmentation",
-    "CUTSnowAugmentation",
+    # "CycleGANFogAugmentation",
+    # "CycleGANRainAugmentation",
+    # "CycleGANSnowAugmentation",
+    # "CUTFogAugmentation",
+    # "CUTRainAugmentation",
+    # "CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
-    "StableDiffusionFogAugmentation",
-    "StableDiffusionRainAugmentation",
-    "StableDiffusionSnowAugmentation",
-    "CycleDiffusionFogAugmentation",
-    "CycleDiffusionRainAugmentation",
-    "CycleDiffusionSnowAugmentation",
+    # "StableDiffusionFogAugmentation",
+    # "StableDiffusionRainAugmentation",
+    # "StableDiffusionSnowAugmentation",
+    # "CycleDiffusionFogAugmentation",
+    # "CycleDiffusionRainAugmentation",
+    # "CycleDiffusionSnowAugmentation",
+    "MGIEDiffusionFogAugmentation",
+    "MGIEDiffusionRainAugmentation",
+    "MGIEDiffusionSnowAugmentation",
+
 ]
 
 ai_transforms = [
@@ -30,6 +34,7 @@ ai_transforms = [
     "CUT",
     "StableDiffusion",
     "CycleDiffusion",
+    "MGIEDiffusion",
 ]
 
 ai_conditions = [
@@ -96,7 +101,7 @@ class TransformSampler():
     def _filter_image_augmentations(self, ops):
         filtered = self._filter_gan_augmentations(ops)
         filtered = self._filter_duplicates(filtered)
-        filtered = self._filter_non_weather(filtered)
+        #filtered = self._filter_non_weather(filtered)
         return filtered
     
     def _filter_gan_augmentations(self, ops):
@@ -134,6 +139,7 @@ class TransformSampler():
     def grid_search(self):
         ops = self._sample_augmentation(magnitude=self.cfg.rand_M)
         ops = self._filter_image_augmentations(ops)
+        ops = ops[:57]
         augs = [self._map_to_transforms(op) for op in ops]
         augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
         print(f"Start from epoch: {self.epochs}")
@@ -150,14 +156,14 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [ShearYAugmentation(magnitude=4), ColorAugmentation(magnitude=4)])]
+        return [RandomAugmentation(self.cfg, 1, [MGIEDiffusionFogAugmentation(magnitude=0)])]
     
     def sample_output(self, magnitude=0):
         # amount of images
         # magnitudes (1-5 or only 5)
         # every gan + every image augmentation
         # how many samples per augmentation
-        transforms = list(product(gan_transforms, image_transforms))
+        transforms = list(product(gan_transforms + diffusion_transforms, image_transforms))
         ops = []
         for transform in transforms:
             aug = [(t, self._magnitude(magnitude)) for t in transform]

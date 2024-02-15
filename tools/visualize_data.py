@@ -54,6 +54,7 @@ def parse_args(in_args=None):
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     args = parse_args()
     logger = setup_logger()
     logger.info("Arguments: " + str(args))

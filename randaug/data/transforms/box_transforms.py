@@ -178,14 +178,6 @@ class SimpleBBTransform(Transform):
     
     def apply_segmentation(self, segmentation):
         return segmentation
-    
-    def _output(self, img):
-        filename = str(uuid.uuid4())
-        filepath = os.path.join("tools/test_vehicles", f'{self.file_name.split("/")[-1]}_{self.count}.jpg')
-        #filepath = os.path.join("tools/vehicles", f'{filename}.jpg')
-        self.count = self.count + 1
-        print("Saving to {} ...".format(filepath))
-        img.save(filepath)
 
     def _load_model(self):
         model = SimpleClassifier().to(self.device) # shift to GPU
@@ -194,8 +186,8 @@ class SimpleBBTransform(Transform):
         return model
     
     def _predict(self, image, box):    
-        cropped = crop_and_pad(image, box)
-        self._output(cropped)
+        #cropped = crop_and_pad(image, box)
+        cropped = crop(image, box)
         cropped = self.transforms(cropped)
         cropped = cropped.unsqueeze(0).to(0) # type: ignore
         return torch.sigmoid(self.model(cropped))
@@ -206,6 +198,40 @@ class SimpleBBTransform(Transform):
                          np.Infinity,
                          np.Infinity])
     
+
+# trained with classificator on images in bounding boxes
+class OutputBBTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+        super().__init__()
+        self.image = image # transformed image
+        self.file_name = file_name
+        self.transforms = TransformList(transforms) # previous transforms
+        self.original = Image.fromarray(image)
+        self.transformed = self.transforms.apply_image(utils.read_image(self.file_name))
+        self.count = 0
+
+    def apply_image(self, img: np.ndarray):
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        cropped = crop(self.image, box)
+        self._output(cropped)
+        return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def _output(self, img):
+        filename = str(uuid.uuid4())
+        filepath = os.path.join("tools/out/vehicles/", f'{filename}.jpg')
+        self.count = self.count + 1
+        print("Saving to {} ...".format(filepath))
+        img.save(filepath)
+
 
 def crop_and_pad(image: np.ndarray, box, resize=True):
 
