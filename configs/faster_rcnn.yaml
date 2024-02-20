@@ -10,9 +10,10 @@ MODEL:
 SOLVER:
   IMS_PER_BATCH: 4
   BASE_LR: 0.001
+  # BASE_LR: 0.000
   WARMUP_ITERS: 500
   STEPS: (210000, 250000)
-  MAX_ITER: 1000
+  MAX_ITER: 100
   GAMMA: 0.052
 DATASETS:
   TRAIN: ("adverse_clear", "adverse_clear_addon_01",)

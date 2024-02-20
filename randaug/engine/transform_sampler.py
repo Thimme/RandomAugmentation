@@ -79,7 +79,7 @@ class TransformSampler():
         
     def _map_to_transforms(self, ops):
         transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
-        transforms = [t(op[1]) for t, op in zip(transforms, ops)]
+        transforms = [t(op[1], cfg=self.cfg) for t, op in zip(transforms, ops)]
         magnitudes = [op[1] for op in ops]
         return transforms, magnitudes
     
@@ -156,7 +156,7 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [MGIEDiffusionFogAugmentation(magnitude=0)])]
+        return [RandomAugmentation(self.cfg, 1, [BrightnessAugmentation(magnitude=0)])]
     
     def sample_output(self, magnitude=0):
         # amount of images
@@ -175,7 +175,8 @@ class TransformSampler():
 
 class RandomSampler():
 
-    def __init__(self, device):
+    def __init__(self, cfg, device):
+        self.cfg = cfg
         self.device = device
 
     def _sample_ops(self, N):
@@ -210,11 +211,12 @@ class RandomSampler():
         magnitudes = [op[1] for op in ops]
         return transforms, magnitudes
     
+    # Random sampling causes the drop augmentation not to distribute across devices so this function is needed
     def _init_transform(self, transform, magnitude) -> T.Augmentation:
         if transform == DropAugmentation:
-            return transform(magnitude, device=self.device)
+            return transform(magnitude, cfg=self.cfg, device=self.device)
         else:
-            return transform(magnitude)
+            return transform(magnitude, cfg=self.cfg)
     
     def _reorder_ops(self, ops, list):
         # Convert B to a set for faster lookup

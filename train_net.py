@@ -5,6 +5,9 @@ from randaug.engine.transform_sampler import TransformSampler
 from randaug.data import datasets
 from randaug.models.detr import add_detr_config
 from detectron2 import model_zoo
+from detectron2.checkpoint import DetectionCheckpointer
+import detectron2.utils.comm as comm
+from detectron2.evaluation import COCOEvaluator, verify_results
 
 
 def setup_frcnn(args):
@@ -44,18 +47,18 @@ def setup_yolo(args):
     cfg.network = 'yolo'
     return cfg
 
-# run static augmentation via grid-search
-def main(args):
-    cfg = setup_frcnn(args)
-    sampler = TransformSampler(cfg, epochs=args.epochs)
+# # run static augmentation via grid-search
+# def main(args):
+#     # cfg = setup_frcnn(args)
+#     cfg = setup_detr(args)
+#     # cfg = setup_yolo(args)
 
-    for rand_M_value in range(0, 5):
-        cfg.rand_M = rand_M_value
+#     sampler = TransformSampler(cfg, epochs=args.epochs)
 
-        for augmentation in sampler.grid_search():
-            trainer = RandTrainer(cfg, augmentation=augmentation) 
-            trainer.resume_or_load(resume=args.resume)
-            trainer.train()
+#     for augmentation in sampler.no_augmentation():
+#         trainer = RandTrainer(cfg, augmentation=augmentation) 
+#         trainer.resume_or_load(resume=args.resume)
+#         trainer.train()
 
 
 # run random augmentation algorithm over all augmentations
@@ -72,6 +75,21 @@ def main(args):
 #             trainer = RandTrainer(cfg, augmentation=None)
 #             trainer.resume_or_load(resume=args.resume)
 #             trainer.train()
+
+
+# Only for fast testing
+def main(args):
+    # cfg = setup_frcnn(args)
+    cfg = setup_detr(args)
+    # cfg = setup_yolo(args)
+
+    model = RandTrainer.build_model(cfg)
+
+    DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
+    res = RandTrainer.test(cfg, model)
+    if comm.is_main_process():
+        verify_results(cfg, res)
+    return res
 
 
 def add_arguments():

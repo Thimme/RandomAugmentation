@@ -1,6 +1,6 @@
 MODEL:
   META_ARCHITECTURE: "Detr"
-  WEIGHTS: "detectron2://ImageNetPretrained/torchvision/R-50.pkl"
+  WEIGHTS: "checkpoints/converted_model.pth"
   PIXEL_MEAN: [123.675, 116.280, 103.530]
   PIXEL_STD: [58.395, 57.120, 57.375]
   MASK_ON: False
@@ -12,14 +12,12 @@ MODEL:
     GIOU_WEIGHT: 2.0
     L1_WEIGHT: 5.0
     NUM_OBJECT_QUERIES: 100
-DATASETS:
-  TRAIN: ("coco_2017_train",)
-  TEST: ("coco_2017_val",)
+   # NUM_CLASSES: 2
 SOLVER:
-  IMS_PER_BATCH: 64
+  IMS_PER_BATCH: 4
   BASE_LR: 0.0001
   STEPS: (369600,)
-  MAX_ITER: 554400
+  MAX_ITER: 1000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 10
   WEIGHT_DECAY: 0.0001
@@ -32,14 +30,12 @@ SOLVER:
     NORM_TYPE: 2.0
 INPUT:
   MIN_SIZE_TRAIN: (480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800)
-  CROP:
-    ENABLED: True
-    TYPE: "absolute_range"
-    SIZE: (384, 600)
   FORMAT: "RGB"
 TEST:
-  EVAL_PERIOD: 4000
+  EVAL_PERIOD: 200
 DATALOADER:
-  FILTER_EMPTY_ANNOTATIONS: False
-  NUM_WORKERS: 4
+  NUM_WORKERS: 1
 VERSION: 2
+DATASETS:
+  TRAIN: ("adverse_clear", "adverse_clear_addon_01",)
+  TEST: ("coco_2017_val", "adverse_fog", "adverse_rain", "adverse_snow", "dense_clear_day", "dense_light_fog_day", "dense_light_fog_night", "dense_fog_day", "dense_fog_night", "dense_rain", "dense_snow_day", "dense_snow_night", "dawn_fog", "dawn_sand", "dawn_rain", "dawn_snow", "nuscenes_clear", "nuscenes_rain", "bdd_clear", "bdd_rain", "bdd_snow", "cityscapes_clear", "cityscapes_fog01", "cityscapes_fog02", "cityscapes_fog03", "acdc_fog", "acdc_rain", "acdc_snow", "providentia_fog", "providentia_snow", "midjourney_snow", "midjourney_rain", "midjourney_fog",)

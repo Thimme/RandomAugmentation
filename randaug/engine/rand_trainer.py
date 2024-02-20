@@ -49,8 +49,7 @@ class RandTrainer(TrainerBase):
         cfg = DefaultTrainer.auto_scale_workers(cfg, comm.get_world_size())
 
         # Assume these objects must be constructed in this order.
-        model = self.build_model(cfg)
-        optimizer = self.build_optimizer(cfg, model)
+        model, optimizer = self.load_model(cfg)
 
         if augmentation == None:
             data_loader = self.build_rand_augment_train_loader(cfg)
@@ -95,6 +94,18 @@ class RandTrainer(TrainerBase):
             # The checkpoint stores the training iteration that just finished, thus we start
             # at the next iteration
             self.start_iter = self.iter + 1
+
+    def load_model(self, cfg):
+        if cfg.network == 'detr':
+            model = self.build_model(cfg)
+            optimizer = self._build_detr_optimizer(cfg, model)
+            return model, optimizer
+        elif cfg.network == 'yolo':
+            return 0, 1
+        else:
+            model = self.build_model(cfg)
+            optimizer = self.build_optimizer(cfg, model)
+            return model, optimizer
 
     def run_step(self):
         self._trainer.iter = self.iter
@@ -193,54 +204,54 @@ class RandTrainer(TrainerBase):
         
         return build_optimizer(cfg, model)
    
-    # @classmethod
-    # def _build_detr_optimizer(cls, cfg, model):
-    #     params: List[Dict[str, Any]] = []
-    #     memo: Set[torch.nn.parameter.Parameter] = set()
-    #     for key, value in model.named_parameters(recurse=True):
-    #         if not value.requires_grad:
-    #             continue
-    #         # Avoid duplicating parameters
-    #         if value in memo:
-    #             continue
-    #         memo.add(value)
-    #         lr = cfg.SOLVER.BASE_LR
-    #         weight_decay = cfg.SOLVER.WEIGHT_DECAY
-    #         if "backbone" in key:
-    #             lr = lr * cfg.SOLVER.BACKBONE_MULTIPLIER
-    #         params += [{"params": [value], "lr": lr, "weight_decay": weight_decay}]
+    @classmethod
+    def _build_detr_optimizer(cls, cfg, model):
+        params: List[Dict[str, Any]] = []
+        memo: Set[torch.nn.parameter.Parameter] = set()
+        for key, value in model.named_parameters(recurse=True):
+            if not value.requires_grad:
+                continue
+            # Avoid duplicating parameters
+            if value in memo:
+                continue
+            memo.add(value)
+            lr = cfg.SOLVER.BASE_LR
+            weight_decay = cfg.SOLVER.WEIGHT_DECAY
+            if "backbone" in key:
+                lr = lr * cfg.SOLVER.BACKBONE_MULTIPLIER
+            params += [{"params": [value], "lr": lr, "weight_decay": weight_decay}]
 
-    #     def maybe_add_full_model_gradient_clipping(optim):  # optim: the optimizer class
-    #         # detectron2 doesn't have full model gradient clipping now
-    #         clip_norm_val = cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE
-    #         enable = (
-    #             cfg.SOLVER.CLIP_GRADIENTS.ENABLED
-    #             and cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model"
-    #             and clip_norm_val > 0.0
-    #         )
+        def maybe_add_full_model_gradient_clipping(optim):  # optim: the optimizer class
+            # detectron2 doesn't have full model gradient clipping now
+            clip_norm_val = cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE
+            enable = (
+                cfg.SOLVER.CLIP_GRADIENTS.ENABLED
+                and cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model"
+                and clip_norm_val > 0.0
+            )
 
-    #         class FullModelGradientClippingOptimizer(optim):
-    #             def step(self, closure=None):
-    #                 all_params = itertools.chain(*[x["params"] for x in self.param_groups])
-    #                 torch.nn.utils.clip_grad_norm_(all_params, clip_norm_val)
-    #                 super().step(closure=closure)
+            class FullModelGradientClippingOptimizer(optim):
+                def step(self, closure=None):
+                    all_params = itertools.chain(*[x["params"] for x in self.param_groups])
+                    torch.nn.utils.clip_grad_norm_(all_params, clip_norm_val)
+                    super().step(closure=closure)
 
-    #         return FullModelGradientClippingOptimizer if enable else optim
+            return FullModelGradientClippingOptimizer if enable else optim
 
-    #     optimizer_type = cfg.SOLVER.OPTIMIZER
-    #     if optimizer_type == "SGD":
-    #         optimizer = maybe_add_full_model_gradient_clipping(torch.optim.SGD)(
-    #             params, cfg.SOLVER.BASE_LR, momentum=cfg.SOLVER.MOMENTUM
-    #         )
-    #     elif optimizer_type == "ADAMW":
-    #         optimizer = maybe_add_full_model_gradient_clipping(torch.optim.AdamW)(
-    #             params, cfg.SOLVER.BASE_LR
-    #         )
-    #     else:
-    #         raise NotImplementedError(f"no optimizer type {optimizer_type}")
-    #     if not cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model":
-    #         optimizer = maybe_add_gradient_clipping(cfg, optimizer)
-    #     return optimizer
+        optimizer_type = cfg.SOLVER.OPTIMIZER
+        if optimizer_type == "SGD":
+            optimizer = maybe_add_full_model_gradient_clipping(torch.optim.SGD)(
+                params, cfg.SOLVER.BASE_LR, momentum=cfg.SOLVER.MOMENTUM
+            )
+        elif optimizer_type == "ADAMW":
+            optimizer = maybe_add_full_model_gradient_clipping(torch.optim.AdamW)(
+                params, cfg.SOLVER.BASE_LR
+            )
+        else:
+            raise NotImplementedError(f"no optimizer type {optimizer_type}")
+        if not cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model":
+            optimizer = maybe_add_gradient_clipping(cfg, optimizer)
+        return optimizer
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
