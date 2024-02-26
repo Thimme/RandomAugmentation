@@ -264,7 +264,7 @@ class StableDiffusionSnowAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image, file_name):
-        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
 
 
 # TODO: Create new diffusion models here
@@ -272,7 +272,7 @@ class StableDiffusionSnowAugmentation(T.Augmentation):
 
 class PlugPlayFogAugmentation(T.Augmentation):
 
-    def __init__(self, magnitude=1):
+    def __init__(self, magnitude=1, cfg=None):
         super().__init__()
         self.name = Augmentations.PLUG_DIFFUSION
         self.weather = Augmentations.FOG
@@ -280,7 +280,7 @@ class PlugPlayFogAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image, file_name):
-        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
     
 
 class PlugPlayRainAugmentation(T.Augmentation):
@@ -306,7 +306,7 @@ class PlugPlaySnowAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image, file_name):
-        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name)
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
 
 
 class ControlNetFogAugmentation(T.Augmentation):
@@ -705,57 +705,6 @@ class GANTransform(Transform):
         
     def apply_coords(self, coords):
         return coords
-    
-    def apply_segmentation(self, segmentation):
-        return segmentation
-    
-
-class MGIETransform(Transform):
-
-    def __init__(self, network, weather, severity, file_path, cfg):
-        super().__init__()
-        self.name = network
-        self.weather = weather
-        self.severity = severity
-        self.file_path = file_path
-
-    def _read_image(self, file_path: str):
-        filename = file_path.split('/')[-1]
-        filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
-        if not os.path.isfile(path):
-            path = f'{path[:-4]}.png'
-        return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
-    
-    def apply_image(self, img: np.ndarray):
-        self.original = img
-        return self.image
-        
-    def apply_coords(self, coords):
-        """
-        Apply crop transform on coordinates.
-
-        Args:
-            coords (ndarray): floating point array of shape Nx2. Each row is
-                (x, y).
-        Returns:
-            ndarray: cropped coordinates.
-        """
-
-        """
-        Crop and resize coords
-        """
-        if self.original.shape == self.image.shape:
-            return coords
-        else:
-            h, w = self.original.shape[0:2]
-            h_new, w_new = self.image.shape[0:2]
-            p = (w-h) // 2
-            coords[:, 0] -= p
-            coords[:, 0] = coords[:, 0] * (w_new * 1.0 / h)
-            coords[:, 1] = coords[:, 1] * (h_new * 1.0 / h)
-            return coords
-
     
     def apply_segmentation(self, segmentation):
         return segmentation
