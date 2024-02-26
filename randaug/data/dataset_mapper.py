@@ -163,7 +163,7 @@ class RandAugmentDatasetMapper(DatasetMapper):
             sem_seg_gt = None
         
         augmentations = T.AugmentationList(self.sampler.random_augmentation(self.N, self.M))
-        print(augmentations)
+        #print(augmentations)
         aug_input = MyAugInput(image, sem_seg=sem_seg_gt, file_name=dataset_dict["file_name"])
         transforms = augmentations(aug_input)
         image, sem_seg_gt = aug_input.image, aug_input.sem_seg

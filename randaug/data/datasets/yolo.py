@@ -62,7 +62,8 @@ def load_annotation(image: str, annotation_fpath: str):
             ymax = (y + height / 2.0) * detection.height
             
             bbox = [float(xmin), float(ymin), float(xmax), float(ymax)]
-            category = 2 # int(split[0])
+            #category = int(split[0])
+            category = 0 # only car
             annotation = AnnotationData(bbox=bbox,
                                         category_id=category)
             detection.add_annotation(annotation)
@@ -93,8 +94,9 @@ def load_yolo_annotations(images_root: str, annotations_fpath: str):
 
 
 def load_yolo_classes():
-    return load_coco_classes()
-    # return ["background", "car"]
+    #return load_coco_classes()
+    return ["car"]
+    #return ["background", "car"]    
 
 def load_coco_classes():
     return [

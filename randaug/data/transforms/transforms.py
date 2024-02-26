@@ -150,11 +150,12 @@ class CycleGANSnowAugmentation(T.Augmentation):
 
 class CUTFogAugmentation(T.Augmentation):
 
-    def __init__(self, magnitude=1):
+    def __init__(self, magnitude=1, cfg=None):
         super().__init__()
         self.name = Augmentations.CUT
         self.weather = Augmentations.FOG
         self.magnitude = magnitude
+        self.cfg = cfg
 
     def get_transform(self, image, file_name):
         return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)

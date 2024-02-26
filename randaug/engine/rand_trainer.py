@@ -273,7 +273,8 @@ class RandTrainer(TrainerBase):
     
     @classmethod
     def build_rand_augment_train_loader(cls, cfg):
-        mapper = RandAugmentDatasetMapper(cfg, is_train=True, sampler=RandomSampler(device=f'cuda:{comm.get_rank()}')) # type: ignore
+        sampler = RandomSampler(cfg=cfg, device=f'cuda:{comm.get_rank()}')
+        mapper = RandAugmentDatasetMapper(cfg, is_train=True, sampler=sampler) # type: ignore
         return build_detection_train_loader(cfg, mapper=mapper)
     
     @classmethod
