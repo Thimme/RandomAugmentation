@@ -2,8 +2,10 @@ import os
 import logging
 import weakref
 import torch
-from collections import OrderedDict
+import itertools
 
+from collections import OrderedDict
+from typing import Any, Dict, List, Set
 from detectron2.engine import DefaultTrainer, hooks
 from detectron2.engine.train_loop import AMPTrainer, SimpleTrainer, TrainerBase
 from detectron2.engine.defaults import create_ddp_model, default_writers
@@ -22,10 +24,12 @@ from detectron2.evaluation import (
     print_csv_format,
     verify_results,
 )
+from detectron2.solver.build import maybe_add_gradient_clipping
 
 from randaug.data.transforms import transforms as W
 from randaug.utils.results_writer import JSONResultsWriter
-from randaug.data.dataset_mapper import MyDatasetMapper
+from randaug.data.dataset_mapper import MyDatasetMapper, RandAugmentDatasetMapper
+from randaug.engine.transform_sampler import RandomSampler
 
 
 class RandTrainer(TrainerBase):
@@ -45,10 +49,15 @@ class RandTrainer(TrainerBase):
         cfg = DefaultTrainer.auto_scale_workers(cfg, comm.get_world_size())
 
         # Assume these objects must be constructed in this order.
-        model = self.build_model(cfg)
-        optimizer = self.build_optimizer(cfg, model)
-        data_loader = self.build_train_loader(cfg, augmentation.get_transforms())
-        
+        model, optimizer = self.load_model(cfg)
+
+        if augmentation == None:
+            data_loader = self.build_rand_augment_train_loader(cfg)
+            self.rand_aug = f"{cfg.rand_N}-{cfg.rand_M}"
+        else:
+            data_loader = self.build_train_loader(cfg, augmentation.get_transforms())
+            self.rand_aug = augmentation
+
         model = create_ddp_model(model, broadcast_buffers=False)
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
             model, data_loader, optimizer
@@ -64,7 +73,6 @@ class RandTrainer(TrainerBase):
         self.start_iter = 0
         self.max_iter = cfg.SOLVER.MAX_ITER
         self.cfg = cfg
-        self.rand_aug = augmentation
         self.register_hooks(self.build_hooks())
 
     def resume_or_load(self, resume=True):
@@ -86,6 +94,18 @@ class RandTrainer(TrainerBase):
             # The checkpoint stores the training iteration that just finished, thus we start
             # at the next iteration
             self.start_iter = self.iter + 1
+
+    def load_model(self, cfg):
+        if cfg.network == 'detr':
+            model = self.build_model(cfg)
+            optimizer = self._build_detr_optimizer(cfg, model)
+            return model, optimizer
+        elif cfg.network == 'yolo':
+            return 0, 1
+        else:
+            model = self.build_model(cfg)
+            optimizer = self.build_optimizer(cfg, model)
+            return model, optimizer
 
     def run_step(self):
         self._trainer.iter = self.iter
@@ -181,7 +201,57 @@ class RandTrainer(TrainerBase):
         It now calls :func:`detectron2.solver.build_optimizer`.
         Overwrite it if you'd like a different optimizer.
         """
+        
         return build_optimizer(cfg, model)
+   
+    @classmethod
+    def _build_detr_optimizer(cls, cfg, model):
+        params: List[Dict[str, Any]] = []
+        memo: Set[torch.nn.parameter.Parameter] = set()
+        for key, value in model.named_parameters(recurse=True):
+            if not value.requires_grad:
+                continue
+            # Avoid duplicating parameters
+            if value in memo:
+                continue
+            memo.add(value)
+            lr = cfg.SOLVER.BASE_LR
+            weight_decay = cfg.SOLVER.WEIGHT_DECAY
+            if "backbone" in key:
+                lr = lr * cfg.SOLVER.BACKBONE_MULTIPLIER
+            params += [{"params": [value], "lr": lr, "weight_decay": weight_decay}]
+
+        def maybe_add_full_model_gradient_clipping(optim):  # optim: the optimizer class
+            # detectron2 doesn't have full model gradient clipping now
+            clip_norm_val = cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE
+            enable = (
+                cfg.SOLVER.CLIP_GRADIENTS.ENABLED
+                and cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model"
+                and clip_norm_val > 0.0
+            )
+
+            class FullModelGradientClippingOptimizer(optim):
+                def step(self, closure=None):
+                    all_params = itertools.chain(*[x["params"] for x in self.param_groups])
+                    torch.nn.utils.clip_grad_norm_(all_params, clip_norm_val)
+                    super().step(closure=closure)
+
+            return FullModelGradientClippingOptimizer if enable else optim
+
+        optimizer_type = cfg.SOLVER.OPTIMIZER
+        if optimizer_type == "SGD":
+            optimizer = maybe_add_full_model_gradient_clipping(torch.optim.SGD)(
+                params, cfg.SOLVER.BASE_LR, momentum=cfg.SOLVER.MOMENTUM
+            )
+        elif optimizer_type == "ADAMW":
+            optimizer = maybe_add_full_model_gradient_clipping(torch.optim.AdamW)(
+                params, cfg.SOLVER.BASE_LR
+            )
+        else:
+            raise NotImplementedError(f"no optimizer type {optimizer_type}")
+        if not cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE == "full_model":
+            optimizer = maybe_add_gradient_clipping(cfg, optimizer)
+        return optimizer
 
     @classmethod
     def build_lr_scheduler(cls, cfg, optimizer):
@@ -198,7 +268,13 @@ class RandTrainer(TrainerBase):
     
     @classmethod
     def build_train_loader(cls, cfg, transforms):
-        mapper = MyDatasetMapper(cfg, is_train=True, augmentations=transforms)
+        mapper = MyDatasetMapper(cfg, is_train=True, augmentations=transforms) # type: ignore
+        return build_detection_train_loader(cfg, mapper=mapper)
+    
+    @classmethod
+    def build_rand_augment_train_loader(cls, cfg):
+        sampler = RandomSampler(cfg=cfg, device=f'cuda:{comm.get_rank()}')
+        mapper = RandAugmentDatasetMapper(cfg, is_train=True, sampler=sampler) # type: ignore
         return build_detection_train_loader(cfg, mapper=mapper)
     
     @classmethod
