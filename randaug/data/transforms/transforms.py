@@ -594,7 +594,7 @@ class GANTransform(Transform):
     def apply_image(self, img: np.ndarray):
         filename = self.file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+        path = os.path.join('/home/mayara/datasets/itsc/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format="BGR")
