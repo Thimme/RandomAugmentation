@@ -37,7 +37,7 @@ def parse_args(in_args=None):
     parser = argparse.ArgumentParser(description="Visualize ground-truth data")
     parser.add_argument("--config-file", metavar="FILE", help="path to config file")
     parser.add_argument("--output-dir", default="./", help="path to output directory")
-    parser.add_argument("--sampling_rate", type=int, default=20, help="Number of images to sample per augmentation policy")
+    parser.add_argument("--sampling_rate", type=int, default=10, help="Number of images to sample per augmentation policy")
     parser.add_argument("--magnitude", type=int, default=0, help="Magnitude of the transforms to be applied")
     return parser.parse_args(in_args)
 
