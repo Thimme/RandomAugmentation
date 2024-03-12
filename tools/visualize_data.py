@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 import sys
-sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation/") # bad code
+sys.path.append("/home/mayara/detection/RandomAugmentation/") # bad code
 
 import argparse
 import os
@@ -28,7 +28,7 @@ def setup(args):
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.rand_N = 2 # number of transforms
     cfg.rand_M = 5 # magnitude of transforms
-    cfg.box_postprocessing = False
+    cfg.box_postprocessing = True
     cfg.freeze()
     return cfg
 

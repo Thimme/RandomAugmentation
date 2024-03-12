@@ -12,7 +12,7 @@ from detectron2.evaluation import verify_results
 def setup_frcnn(args):
     cfg = get_cfg()
     cfg.dataroot = args.dataroot
-    cfg.merge_from_file("configs/fasterrcnn.yaml")
+    cfg.merge_from_file("configs/faster_rcnn.yaml")
     cfg.eval_output = "./evaluation"
     cfg.network = 'frcnn'
     return cfg
@@ -46,10 +46,7 @@ def randaug(cfg, args):
             trainer.resume_or_load(resume=args.resume)
             trainer.train()
 
-def grid_search(cfg, args):
-    cfg.rand_N = 2 # number of transforms
-    cfg.rand_M = 0 # magnitude of transforms
-    
+def diffusion_search(cfg, args):  
     sampler = TransformSampler(cfg, epochs=args.epochs)
 
     for augmentation in sampler.diffusion_search():
@@ -67,7 +64,8 @@ def inference(cfg, args):
     return res
 
 def main(args):
-        setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+        #setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+        setup_funcs = [setup_frcnn]
         #cfg = setup_frcnn(args)
         #cfg = setup_detr(args)
         #cfg = setup_retinanet(args)
@@ -75,12 +73,12 @@ def main(args):
         for setup_func in setup_funcs:
             cfg = setup_func(args)
             #cfg.SOLVER.BASE_LR = lr
-            cfg.box_postprocessing = False
+            cfg.box_postprocessing = True
+            cfg.rand_N = 2 # number of transforms
+            cfg.rand_M = 0 # magnitude of transforms
             default_setup(cfg, args)
 
-            randaug(cfg, args)
-            # grid_search(cfg, args)
-            # inference(cfg, args)
+            diffusion_search(cfg, args)
 
 def add_arguments():
     parser = default_argument_parser()
@@ -117,7 +115,7 @@ def finetune():
             #cfg = setup_retinanet(args)
 
             cfg.SOLVER.BASE_LR = lr
-            cfg.box_postprocessing = False
+            cfg.box_postprocessing = True
             default_setup(cfg, args)
 
             randaug(cfg, args)

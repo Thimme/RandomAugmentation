@@ -166,7 +166,7 @@ class TransformSampler():
         return augs
 
     def diffusion_search(self):
-        ops = self._sample_diffusion_models(ids=[1, 2, 3, 4, 5])
+        ops = self._sample_diffusion_models(ids=[1])
         augs = [self._map_to_transforms(op) for op in ops] 
         augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
         print(augs)
@@ -176,7 +176,9 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [RotationAugmentation(magnitude=0), ColorAugmentation(magnitude=4)])]
+        #return [RandomAugmentation(self.cfg, 1, [RotationAugmentation(magnitude=0), ColorAugmentation(magnitude=4)])]
+        return [RandomAugmentation(self.cfg, 1, [StableDiffusionRainAugmentation(magnitude=1, cfg=self.cfg)])]
+        #return [RandomAugmentation(self.cfg, 1, [])]
     
     def sample_output(self, magnitude=0):
         # amount of images
@@ -214,7 +216,7 @@ class RandomSampler():
                 sampled = [self._replace_sample(s) for s in sampled]
                 return sampled
             
-    def _replace_sample(self, sample):
+    def _replace_sample(self, samplloade):
         if sample in ai_transforms:
             condition = random.choice(ai_conditions)
             return f"{sample}{condition}"

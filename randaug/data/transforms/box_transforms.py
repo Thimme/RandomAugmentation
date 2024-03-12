@@ -11,6 +11,8 @@ from math import log10, sqrt
 from fvcore.transforms.transform import Transform, TransformList, NoOpTransform
 from skimage.metrics import structural_similarity as ssim
 from randaug.data.classifier.classifier import SimpleClassifier
+from randaug.data.classifier.clip import CLIPClassifier
+from randaug.data.classifier.dino import DINOClassifier
 from detectron2.data import detection_utils as utils
 
 
@@ -137,6 +139,91 @@ class AdjustBBTransform(Transform):
                          np.Infinity,
                          np.Infinity,
                          np.Infinity])
+
+
+# trained with classificator on images in bounding boxes
+class CLIPBBTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+        super().__init__()
+        self.image = image # transformed image
+        self.device = f'cuda:{comm.get_rank()}'
+        self.model = CLIPClassifier(device = self.device)#.to(self.device)
+        self.threshold = 0.5
+
+    def apply_image(self, img: np.ndarray):
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        try:
+            if self._predict(self.image, box) < self.threshold:
+                #print('removeu')
+                return self._invalidate_bbox()     
+            else:
+                #print('manteve')
+                return box
+        except (AttributeError, NotImplementedError):
+            return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def _predict(self, image, box):    
+        cropped = crop_and_pad(image, box)
+        #cropped = cropped.unsqueeze(0).to(self.device) # type: ignore
+        return self.model(cropped)
+
+    def _invalidate_bbox(self):
+        return np.array([np.Infinity,
+                         np.Infinity,
+                         np.Infinity,
+                         np.Infinity])
+
+
+# trained with classificator on images in bounding boxes
+class DINOBBTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+        super().__init__()
+        self.image = image # transformed image
+        self.device = f'cuda:{comm.get_rank()}'
+        self.model = DINOClassifier(device = self.device)#.to(self.device)
+
+    def apply_image(self, img: np.ndarray):
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        try:
+            pred = self._predict(self.image, box)
+            if pred == 'non-vehicles':
+                #print('removeu')
+                return self._invalidate_bbox()     
+            else:
+                #print('manteve')
+                return box
+        except (AttributeError, NotImplementedError):
+            return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def _predict(self, image, box):    
+        cropped = crop_and_pad(image, box)
+        #cropped = cropped.unsqueeze(0).to(self.device) # type: ignore
+        return self.model(cropped)
+
+    def _invalidate_bbox(self):
+        return np.array([np.Infinity,
+                         np.Infinity,
+                         np.Infinity,
+                         np.Infinity])
+
 
 
 # trained with classificator on images in bounding boxes

@@ -11,7 +11,7 @@ from fvcore.transforms.transform import Transform
 from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from enum import Enum
-from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform
+from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform
 
 MAGNITUDE_BINS = 5 
 
@@ -626,6 +626,10 @@ class BoundingboxAugmentation(T.Augmentation):
             return SimilarityBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'generate_samples':
             return OutputBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'clip':
+            return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'dino':
+            return DINOBBTransform(image=image, file_name=file_name, transforms=transforms)
         else:
             return NotImplementedError
     
@@ -648,15 +652,17 @@ class RandomAugmentation():
     def get_transforms(self):
         if self.cfg.box_postprocessing == True:
             return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
+            #return self.augmentations + self._append_standard_transform()
         else:
             return self.augmentations + self._append_standard_flip()
+            #return self.augmentations
     
     def _append_standard_flip(self):
         aug = T.RandomFlip(prob=0.5)
         return [aug]
 
     def _append_standard_transform(self):
-        aug = BoundingboxAugmentation(algorithm='generate_samples')
+        aug = BoundingboxAugmentation(algorithm='dino')
         return [aug]
     
 
@@ -698,6 +704,7 @@ class GANTransform(Transform):
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
+        #return utils.read_image(path)
     
     def apply_image(self, img: np.ndarray):
         self.original = img
