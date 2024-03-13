@@ -12,8 +12,7 @@ from ..data_classes import DatasetInfo
 from detectron2.config import get_cfg
 
 
-#DEFAULT_DATASETS_ROOT = "/mnt/ssd2/dataset/cvpr24/"
-DEFAULT_DATASETS_ROOT = "/home/mayara/datasets/itsc/"
+DEFAULT_DATASETS_ROOT = "/home/rothmeier/Documents/datasets/cvpr24"
 
 
 # -------- MIDJOURNEY -----------

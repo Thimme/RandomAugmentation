@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 import sys
-sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation/") # bad code
+sys.path.append("/home/rothmeier/Documents/github/RandomAugmentation") # bad code
 
 import argparse
 import os

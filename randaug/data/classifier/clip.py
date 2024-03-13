@@ -10,19 +10,16 @@ class CLIPClassifier(nn.Module):
     # device loading may be added here
     def __init__(self, device):
         super().__init__()
-        #self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model, self.preprocess = self._init_clip_model(device)
-        self.preprocessed_text = clip.tokenize(["a photo without a vehicle", "a photo with a vehicle"])#.to(self.device)          
+        self.device = device
+        self.model, self.preprocess = self._init_clip_model()
+        self.preprocessed_text = clip.tokenize(["a photo without a vehicle", "a photo with a vehicle"]).to(self.device)          
 
-    def _init_clip_model(self, device):
-        #model, preprocess = clip.load("ViT-B/32", device=device)
-        model, preprocess = clip.load("ViT-B/32")
-
+    def _init_clip_model(self):
+        model, preprocess = clip.load("ViT-B/32", device=self.device)
         return model, preprocess
 
     def forward(self, x):
-        #x = self.preprocess(x).unsqueeze(0).to(self.device)
-        x = self.preprocess(x).unsqueeze(0)
+        x = self.preprocess(x).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
             image_logits, _ = self.model(x, self.preprocessed_text)

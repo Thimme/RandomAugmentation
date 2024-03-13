@@ -148,7 +148,7 @@ class CLIPBBTransform(Transform):
         super().__init__()
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
-        self.model = CLIPClassifier(device = self.device)#.to(self.device)
+        self.model = CLIPClassifier(device=self.device)#.to(self.device)
         self.threshold = 0.5
 
     def apply_image(self, img: np.ndarray):
@@ -294,7 +294,7 @@ class OutputBBTransform(Transform):
         self.image = image # transformed image
         self.file_name = file_name
         self.transforms = TransformList(transforms) # previous transforms
-        self.original = Image.fromarray(image)
+        self.original = np.array(Image.open(self.file_name))
         self.transformed = self.transforms.apply_image(utils.read_image(self.file_name))
         self.count = 0
 
@@ -302,8 +302,11 @@ class OutputBBTransform(Transform):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
-        cropped = crop(self.image, box)
-        self._output(cropped)
+        cropped = crop_and_pad(self.image, box)
+        cropped_original = crop_and_pad(self.original, box)
+        filename = str(uuid.uuid4())
+        self._output(cropped_original, filename, "tools/out/vehicles_original/")
+        self._output(cropped, filename, "tools/out/vehicles_augmented/")
         return box
             
     def apply_coords(self, coords):
@@ -312,9 +315,8 @@ class OutputBBTransform(Transform):
     def apply_segmentation(self, segmentation):
         return segmentation
     
-    def _output(self, img):
-        filename = str(uuid.uuid4())
-        filepath = os.path.join("tools/out/vehicles/", f'{filename}.jpg')
+    def _output(self, img, filename, path):
+        filepath = os.path.join(path, f'{filename}.jpg')
         self.count = self.count + 1
         print("Saving to {} ...".format(filepath))
         img.save(filepath)

@@ -651,8 +651,7 @@ class RandomAugmentation():
     
     def get_transforms(self):
         if self.cfg.box_postprocessing == True:
-            return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
-            #return self.augmentations + self._append_standard_transform()
+            return self.augmentations + self._append_standard_transform() + self._append_standard_flip()
         else:
             return self.augmentations + self._append_standard_flip()
             #return self.augmentations
@@ -700,7 +699,7 @@ class GANTransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/home/mayara/datasets/itsc/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+        path = os.path.join('/home/rothmeier/Documents/datasets/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)

@@ -7,6 +7,7 @@ from randaug.models.detr import add_detr_config
 from detectron2.checkpoint import DetectionCheckpointer
 import detectron2.utils.comm as comm
 from detectron2.evaluation import verify_results
+import torch.multiprocessing as mp
 
 
 def setup_frcnn(args):
@@ -89,6 +90,7 @@ def add_arguments():
 
 if __name__ == "__main__":
     args = add_arguments().parse_args()
+    mp.set_start_method('spawn')
     print("Command Line Args:", args)
     launch(
         main,
