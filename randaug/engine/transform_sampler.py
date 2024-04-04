@@ -4,37 +4,44 @@ import sys
 import random
 from detectron2.data.transforms.augmentation_impl import *
 from randaug.data.transforms.transforms import *
+from fvcore.transforms.transform import NoOpTransform
+
 
 from itertools import product
 
 gan_transforms = [
-    # "CycleGANFogAugmentation",
-    # "CycleGANRainAugmentation",
-    # "CycleGANSnowAugmentation",
-    # "CUTFogAugmentation",
-    # "CUTRainAugmentation",
-    # "CUTSnowAugmentation",
+    "CycleGANFogAugmentation",
+    "CycleGANRainAugmentation",
+    "CycleGANSnowAugmentation",
+    "CUTFogAugmentation",
+    "CUTRainAugmentation",
+    "CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
-    # "StableDiffusionFogAugmentation",
-    # "StableDiffusionRainAugmentation",
-    # "StableDiffusionSnowAugmentation",
-    # "CycleDiffusionFogAugmentation",
-    # "CycleDiffusionRainAugmentation",
-    # "CycleDiffusionSnowAugmentation",
-    "MGIEDiffusionFogAugmentation",
-    "MGIEDiffusionRainAugmentation",
-    "MGIEDiffusionSnowAugmentation",
-
+    #"StableDiffusionFogAugmentation",
+    #"StableDiffusionRainAugmentation",
+    #"StableDiffusionSnowAugmentation",
+    #"CycleDiffusionFogAugmentation",
+    #"CycleDiffusionRainAugmentation",
+    #"CycleDiffusionSnowAugmentation",
+    #"MGIEDiffusionFogAugmentation",
+    #"MGIEDiffusionRainAugmentation",
+    #"MGIEDiffusionSnowAugmentation",
+    #"PlugPlayFogAugmentation",
+    #"PlugPlayRainAugmentation",
+    #"PlugPlaySnowAugmentation",
+    #"ControlNetFogAugmentation",
+    #"ControlNetRainAugmentation",
+    #"ControlNetSnowAugmentation",
 ]
 
 ai_transforms = [
-    "CycleGAN",
-    "CUT",
-    "StableDiffusion",
-    "CycleDiffusion",
-    "MGIEDiffusion",
+    #"CycleGAN",
+    #"CUT",
+    #"StableDiffusion",
+    #"CycleDiffusion",
+    #"MGIEDiffusion",
 ]
 
 ai_conditions = [
@@ -44,25 +51,29 @@ ai_conditions = [
 ]
 
 image_transforms = [
-    "ColorAugmentation",
-    "ShearXAugmentation",
-    "ShearYAugmentation",
-    "FogAugmentation",
-    "SnowAugmentation",
+    #"ColorAugmentation",
+    #"ShearXAugmentation",
+    #"ShearYAugmentation",
+    #"FogAugmentation",
+    #"SnowAugmentation",
     "RainAugmentation",
-    "TranslateXAugmentation",
-    "TranslateYAugmentation",
-    "AutoContrastAugmentation",
-    "InvertAugmentation",
-    "EqualizeAugmentation", #
-    "SolarizeAugmentation",
-    "PosterizeAugmentation",
-    "ContrastAugmentation",
-    "BrightnessAugmentation",
-    "SharpnessAugmentation",
-    "CutoutAugmentation",
-    "DropAugmentation",
-    "RotationAugmentation",
+    #"TranslateXAugmentation",
+    #"TranslateYAugmentation",
+    #"AutoContrastAugmentation",
+    #"InvertAugmentation",
+    #"EqualizeAugmentation",
+    #"SolarizeAugmentation",
+    #"PosterizeAugmentation",
+    #"ContrastAugmentation",
+    #"BrightnessAugmentation",
+    #"SharpnessAugmentation",
+    #"CutoutAugmentation",
+    #"DropAugmentation",
+    #"RotationAugmentation",
+    #"AutoAugmentAugmentation",
+    #"RandAugmentAugmentation",
+    #"TrivialWideAugmentation",
+    #"AugMixAugmentation"
 ]
 
 NUM_DATASETS = 32
@@ -89,6 +100,14 @@ class TransformSampler():
         for transform in transforms:
             aug = [(t, self._magnitude(magnitude)) for t in transform]
             augs.append(aug)
+
+        return augs
+    
+    def _sample_diffusion_models(self, ids=[]):
+        augs = []
+        transforms = gan_transforms + diffusion_transforms
+        for transform in transforms:
+            _ = [augs.append([(transform, id)]) for id in ids]
 
         return augs
     
@@ -156,7 +175,15 @@ class TransformSampler():
         return [RandomAugmentation(self.cfg, 1, [])]
     
     def test(self):
-        return [RandomAugmentation(self.cfg, 1, [BrightnessAugmentation(magnitude=0)])]
+        #return [RandomAugmentation(self.cfg, 1, [])]
+        return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), BoundingboxAugmentation(algorithm='dino', cfg=self.cfg)])]
+    
+    def diffusion_search(self):
+        ops = self._sample_diffusion_models(ids=[0])
+        augs = [self._map_to_transforms(op) for op in ops] 
+        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        print(augs)
+        return augs
     
     def sample_output(self, magnitude=0):
         # amount of images
@@ -178,6 +205,7 @@ class RandomSampler():
     def __init__(self, cfg, device):
         self.cfg = cfg
         self.device = device
+        self.probability = cfg.aug_prob
 
     def _sample_ops(self, N):
         transforms = ai_transforms + image_transforms
@@ -194,10 +222,15 @@ class RandomSampler():
                 sampled = [self._replace_sample(s) for s in sampled]
                 return sampled
             
+    # This is implemented to reduce the amount of sampling for ai based augmentations
+    # 
     def _replace_sample(self, sample):
         if sample in ai_transforms:
-            condition = random.choice(ai_conditions)
-            return f"{sample}{condition}"
+            while True:
+                condition = random.choice(ai_conditions)
+                aug = f"{sample}{condition}"
+                if aug in diffusion_transforms + gan_transforms:
+                    return aug 
         else:
             return sample
     
@@ -229,6 +262,8 @@ class RandomSampler():
         return np.concatenate((in_list, not_in_list))
 
     def random_augmentation(self, N, M):
+        if random.uniform(0, 1) > self.probability:
+            return [NoOpTransform()]
         ops = self._sample_ops(N)
         ops = self._reorder_ops(ops, gan_transforms + diffusion_transforms)
         ops = self._add_magnitude(ops, M)

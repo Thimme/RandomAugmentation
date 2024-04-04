@@ -4,14 +4,15 @@ import os
 import math
 import random
 from detectron2.utils import comm
-from PIL import ImageOps, ImageEnhance
+from PIL import ImageOps, ImageEnhance, Image
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
 from fvcore.transforms.transform import Transform
 from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from enum import Enum
-from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform
+from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform
+from torchvision import transforms as v1
 
 MAGNITUDE_BINS = 5 
 
@@ -45,6 +46,10 @@ class Augmentations(Enum):
     BRIGHTNESS = 'brightness'
     SHARPNESS = 'sharpness'
     CUTOUT = 'cutout'
+    AUTO_AUGMENT = 'autoaugment'
+    RAND_AUGMENT = 'randaugment'
+    TRIVIAL_WIDE = 'trivialwide'
+    AUG_MIX = 'augmix'
 
 def random_invert(number):
     if random.choice([True, False]):
@@ -535,7 +540,7 @@ class BoundingboxAugmentation(T.Augmentation):
         self.cfg = cfg
     
     def get_transform(self, image, file_name, transforms):
-        if self.algorithm == 'invalidate':
+        if self.algorithm == 'simple':
             return SimpleBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'adjust':
             return AdjustBBTransform(image=image, file_name=file_name, transforms=transforms)
@@ -543,9 +548,57 @@ class BoundingboxAugmentation(T.Augmentation):
             return SimilarityBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'generate_samples':
             return OutputBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'clip':
+            return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'dino':
+            return DINOBBTransform(image=image, file_name=file_name, transforms=transforms)
         else:
             return NotImplementedError
+
+class AutoAugmentAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.AUTO_AUGMENT
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        return AutoAugmentTransform(name=self.name, severity=self.magnitude)
+
+
+class RandAugmentAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.RAND_AUGMENT
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        return AutoAugmentTransform(name=self.name, severity=self.magnitude)
     
+class TrivialWideAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.TRIVIAL_WIDE
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        return AutoAugmentTransform(name=self.name, severity=self.magnitude)
+    
+class AugMixAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.AUG_MIX
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        return AutoAugmentTransform(name=self.name, severity=self.magnitude)
 
 # Wrapper class for random augmentations
 class RandomAugmentation():
@@ -573,7 +626,7 @@ class RandomAugmentation():
         return [aug]
 
     def _append_standard_transform(self):
-        aug = BoundingboxAugmentation(algorithm='generate_samples')
+        aug = BoundingboxAugmentation(algorithm='dino')
         return [aug]
     
 
@@ -611,7 +664,9 @@ class GANTransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        #path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.weather), filename_jpg)
+
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
@@ -642,7 +697,9 @@ class MGIETransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        #path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
@@ -676,6 +733,39 @@ class MGIETransform(Transform):
             coords[:, 1] = coords[:, 1] * (h_new * 1.0 / h)
             return coords
 
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+
+class AutoAugmentTransform(Transform):
+
+    def __init__(self, name, severity, device=None):
+        super().__init__()
+        self.name = name
+        self.device = device
+        self.severity = severity
+        self.transform = self.setup_augmentation(self.name)
+
+    def setup_augmentation(self, policy):
+        if policy == Augmentations.AUTO_AUGMENT:
+            return v1.AutoAugment(policy=v1.AutoAugmentPolicy.IMAGENET)
+        elif policy == Augmentations.RAND_AUGMENT:
+            return v1.RandAugment(num_ops=2)
+        elif policy == Augmentations.AUG_MIX:
+            return v1.AugMix()
+        elif policy == Augmentations.TRIVIAL_WIDE:
+            return v1.TrivialAugmentWide()
+        else:
+            return NotImplementedError
+
+
+    def apply_image(self, img: np.ndarray):
+        img = self.transform(Image.fromarray(img)) # type: ignore
+        return np.array(img)
+    
+    def apply_coords(self, coords):
+        return coords
     
     def apply_segmentation(self, segmentation):
         return segmentation

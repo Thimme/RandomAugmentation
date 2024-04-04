@@ -1,3 +1,4 @@
+
 import numpy as np
 import lpips
 import torch
@@ -10,7 +11,7 @@ from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from math import log10, sqrt 
 from fvcore.transforms.transform import Transform, TransformList, NoOpTransform
 from skimage.metrics import structural_similarity as ssim
-from randaug.data.classifier.classifier import SimpleClassifier
+from randaug.data.classifier.classifier import SimpleClassifier, CLIPClassifier, DINOClassifier
 from detectron2.data import detection_utils as utils
 
 
@@ -140,6 +141,88 @@ class AdjustBBTransform(Transform):
 
 
 # trained with classificator on images in bounding boxes
+class CLIPBBTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+        super().__init__()
+        self.image = image # transformed image
+        self.device = f'cuda:{comm.get_rank()}'
+        self.model = CLIPClassifier(device=self.device)#.to(self.device)
+        self.threshold = 0.5
+
+    def apply_image(self, img: np.ndarray):
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        try:
+            if self._predict(self.image, box) < self.threshold:
+                #print('removeu')
+                return self._invalidate_bbox()     
+            else:
+                #print('manteve')
+                return box
+        except (AttributeError, NotImplementedError):
+            return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def _predict(self, image, box):    
+        cropped = crop_and_pad(image, box)
+        #cropped = cropped.unsqueeze(0).to(self.device) # type: ignore
+        return self.model(cropped)
+
+    def _invalidate_bbox(self):
+        return np.array([np.Infinity,
+                         np.Infinity,
+                         np.Infinity,
+                         np.Infinity])
+
+
+# trained with classificator on images in bounding boxes
+class DINOBBTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+        super().__init__()
+        self.image = image # transformed image
+        self.device = f'cuda:{comm.get_rank()}'
+        self.model = DINOClassifier(device = self.device)
+        self.threshold = 0.05
+
+    def apply_image(self, img: np.ndarray):
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        try:
+            if self._predict(self.image, box) < self.threshold:
+                return self._invalidate_bbox()
+            else:
+                return box
+        except (AttributeError, NotImplementedError):
+            return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def _predict(self, image, box):    
+        cropped = crop_and_pad(image, box)
+        return self.model(cropped)
+
+    def _invalidate_bbox(self):
+        return np.array([np.Infinity,
+                         np.Infinity,
+                         np.Infinity,
+                         np.Infinity])
+
+
+
+# trained with classificator on images in bounding boxes
 class SimpleBBTransform(Transform):
 
     def __init__(self, image: np.ndarray, file_name: str, transforms: list):
@@ -165,6 +248,7 @@ class SimpleBBTransform(Transform):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
+        return self._invalidate_bbox()
         try:
             if self._predict(self.image, box) < 0.4:
                 return self._invalidate_bbox()     
@@ -181,7 +265,7 @@ class SimpleBBTransform(Transform):
 
     def _load_model(self):
         model = SimpleClassifier().to(self.device) # shift to GPU
-        model.load_state_dict(torch.load('randaug/data/classifier/vehicle_classifier.pth'))
+        model.load_state_dict(torch.load('checkpoints/vehicle_classifier.pth'))
         model.eval()
         return model
     
@@ -207,7 +291,7 @@ class OutputBBTransform(Transform):
         self.image = image # transformed image
         self.file_name = file_name
         self.transforms = TransformList(transforms) # previous transforms
-        self.original = Image.fromarray(image)
+        self.original = np.array(Image.open(self.file_name))
         self.transformed = self.transforms.apply_image(utils.read_image(self.file_name))
         self.count = 0
 
@@ -215,8 +299,11 @@ class OutputBBTransform(Transform):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
-        cropped = crop(self.image, box)
-        self._output(cropped)
+        cropped = crop_and_pad(self.image, box)
+        cropped_original = crop_and_pad(self.original, box)
+        filename = str(uuid.uuid4())
+        self._output(cropped_original, filename, "tools/out/vehicles_original/")
+        self._output(cropped, filename, "tools/out/vehicles_augmented/")
         return box
             
     def apply_coords(self, coords):
@@ -225,9 +312,8 @@ class OutputBBTransform(Transform):
     def apply_segmentation(self, segmentation):
         return segmentation
     
-    def _output(self, img):
-        filename = str(uuid.uuid4())
-        filepath = os.path.join("tools/out/vehicles/", f'{filename}.jpg')
+    def _output(self, img, filename, path):
+        filepath = os.path.join(path, f'{filename}.jpg')
         self.count = self.count + 1
         print("Saving to {} ...".format(filepath))
         img.save(filepath)
