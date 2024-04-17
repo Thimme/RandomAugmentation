@@ -8,30 +8,30 @@ from randaug.data.transforms.transforms import *
 from itertools import product
 
 gan_transforms = [
-    #"CycleGANFogAugmentation",
-    #"CycleGANRainAugmentation",
-    #"CycleGANSnowAugmentation",
-    #"CUTFogAugmentation",
-    #"CUTRainAugmentation",
-    #"CUTSnowAugmentation",
+    "CycleGANFogAugmentation",
+    "CycleGANRainAugmentation",
+    "CycleGANSnowAugmentation",
+    "CUTFogAugmentation",
+    "CUTRainAugmentation",
+    "CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
-    #"CycleDiffusionFogAugmentation",
-    #"CycleDiffusionRainAugmentation",
-    #"CycleDiffusionSnowAugmentation",
+    "CycleDiffusionFogAugmentation",
+    "CycleDiffusionRainAugmentation",
+    "CycleDiffusionSnowAugmentation",
     "StableDiffusionFogAugmentation",
     "StableDiffusionRainAugmentation",
     "StableDiffusionSnowAugmentation",
-    #"PlugPlayFogAugmentation",
-    #"PlugPlayRainAugmentation",
-    #"PlugPlaySnowAugmentation",
-    #"ControlNetFogAugmentation",
-    #"ControlNetRainAugmentation",
-    #"ControlNetSnowAugmentation",
-    #"MGIEDiffusionFogAugmentation",
-    #"MGIEDiffusionRainAugmentation",
-    #"MGIEDiffusionSnowAugmentation",
+    "PlugPlayFogAugmentation",
+    "PlugPlayRainAugmentation",
+    "PlugPlaySnowAugmentation",
+    "ControlNetFogAugmentation",
+    "ControlNetRainAugmentation",
+    "ControlNetSnowAugmentation",
+    "MGIEDiffusionFogAugmentation",
+    "MGIEDiffusionRainAugmentation",
+    "MGIEDiffusionSnowAugmentation",
 ]
 
 
@@ -100,7 +100,8 @@ class TransformSampler():
     
     def _sample_diffusion_models(self, ids=[]):
         augs = []
-        for transform in diffusion_transforms:
+        transforms = diffusion_transforms + gan_transforms
+        for transform in transforms:
             _ = [augs.append([(transform, id)]) for id in ids]
 
         return augs

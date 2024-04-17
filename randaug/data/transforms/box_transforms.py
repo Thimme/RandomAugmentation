@@ -15,6 +15,8 @@ from randaug.data.classifier.clip import CLIPClassifier
 from randaug.data.classifier.dino import DINOClassifier
 from detectron2.data import detection_utils as utils
 
+import yaml
+import json
 
 # Bounding box transforms
 
@@ -144,20 +146,58 @@ class AdjustBBTransform(Transform):
 # trained with classificator on images in bounding boxes
 class CLIPBBTransform(Transform):
 
-    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list, thresholds = None):
         super().__init__()
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
         self.model = CLIPClassifier(device=self.device)#.to(self.device)
-        self.threshold = 0.5
+        self.thresholds = thresholds
 
     def apply_image(self, img: np.ndarray):
         return img
     
+    def calculate_box_size(self, box):
+        x1, y1, x2, y2, = box[0]
+        # Calculate length and width of the rectangle
+        length = abs(x2 - x1)
+        width = abs(y2 - y1)
+        # Calculate area of the rectangle
+        area = length * width
+        if area < 1024: #32²
+            return 'small_bb'
+        elif area < 9216: #96²
+            return 'medium_bb' 
+        else:
+            return 'large_bb'
+
+    def update_num_bb_json(self, box_size, type):
+        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2} 
+        json_path = './output/num_bb.json'
+        with open(json_path, 'r') as file:
+            json_data = json.load(file) 
+
+        model = list(json_data.keys())[-1] #last model is the one used now
+        box_size_index = dict_box_size[box_size]
+
+        json_data[model][box_size_index][box_size][type] = json_data[model][box_size_index][box_size][type] + 1
+
+        updated_json_string = json.dumps(json_data, indent=4)
+
+        with open(json_path, 'w') as file:
+            file.write(updated_json_string)
+    
     def apply_box(self, box: np.ndarray) -> np.ndarray:
+        box_size = self.calculate_box_size(box)
+        self.update_num_bb_json(box_size, 'total')
+
+        threshold = self.thresholds[box_size]
+
+        if threshold == -1:
+            return box
+        
         try:
-            if self._predict(self.image, box) < self.threshold:
-                #print('removeu')
+            if self._predict(self.image, box) < threshold:
+                self.update_num_bb_json(box_size, 'removed')
                 return self._invalidate_bbox()     
             else:
                 #print('manteve')
@@ -182,29 +222,71 @@ class CLIPBBTransform(Transform):
                          np.Infinity,
                          np.Infinity])
 
-
 # trained with classificator on images in bounding boxes
 class DINOBBTransform(Transform):
 
-    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list, thresholds = None):
         super().__init__()
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
         self.model = DINOClassifier(device = self.device)#.to(self.device)
+        self.num_bb = 0
+        self.num_bb_removed = 0
+        #self.threshold = 0.005
+        self.thresholds = thresholds 
 
     def apply_image(self, img: np.ndarray):
         return img
     
+    def calculate_box_size(self, box):
+        x1, y1, x2, y2, = box[0]
+        # Calculate length and width of the rectangle
+        length = abs(x2 - x1)
+        width = abs(y2 - y1)
+        # Calculate area of the rectangle
+        area = length * width
+        if area < 1024: #32²
+            return 'small_bb'
+        elif area < 9216: #96²
+            return 'medium_bb' 
+        else:
+            return 'large_bb'
+
+    def update_num_bb_json(self, box_size, type):
+        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2} 
+        json_path = './output/num_bb.json'
+        with open(json_path, 'r') as file:
+            json_data = json.load(file) 
+
+        model = list(json_data.keys())[-1] #last model is the one used now
+        box_size_index = dict_box_size[box_size]
+
+        json_data[model][box_size_index][box_size][type] = json_data[model][box_size_index][box_size][type] + 1
+
+        updated_json_string = json.dumps(json_data, indent=4)
+
+        with open(json_path, 'w') as file:
+            file.write(updated_json_string)
+    
     def apply_box(self, box: np.ndarray) -> np.ndarray:
+
+        box_size = self.calculate_box_size(box)
+        self.update_num_bb_json(box_size, 'total')
+        threshold = self.thresholds[box_size]
+
+        if threshold == -1:
+            return box
+        
         try:
-            pred = self._predict(self.image, box)
-            if pred == 'non-vehicles':
-                #print('removeu')
+            if self._predict(self.image, box) < threshold:
+                self.update_num_bb_json(box_size, 'removed')
                 return self._invalidate_bbox()     
             else:
-                #print('manteve')
                 return box
-        except (AttributeError, NotImplementedError):
+            
+            
+        except (AttributeError, NotImplementedError) as error:
+            print(error)
             return box
             
     def apply_coords(self, coords):

@@ -12,6 +12,7 @@ from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from enum import Enum
 from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform
+import json
 
 MAGNITUDE_BINS = 5 
 
@@ -613,10 +614,24 @@ class CutoutAugmentation(T.Augmentation):
 
 class BoundingboxAugmentation(T.Augmentation):
     
-    def __init__(self, algorithm=None, cfg=None):
+    def __init__(self, algorithm=None, cfg=None, augmentation=None):
         self.algorithm = algorithm
         self.cfg = cfg
+        self.augmentation = augmentation
+
     
+    def get_thresholds(self, path_json):
+        with open(path_json) as f:
+            data = json.load(f)
+        thresholds = {} 
+        # Access the value based on the variable
+        if self.augmentation in data:
+            values = data[self.augmentation]
+            for item in values:
+                for key, value in item.items():
+                    thresholds[key] = value
+        return thresholds
+
     def get_transform(self, image, file_name, transforms):
         if self.algorithm == 'invalidate':
             return SimpleBBTransform(image=image, file_name=file_name, transforms=transforms)
@@ -627,9 +642,9 @@ class BoundingboxAugmentation(T.Augmentation):
         elif self.algorithm == 'generate_samples':
             return OutputBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'clip':
-            return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms)
+            return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms, thresholds=self.get_thresholds('./checkpoints/clip_thresholds.json'))
         elif self.algorithm == 'dino':
-            return DINOBBTransform(image=image, file_name=file_name, transforms=transforms)
+            return DINOBBTransform(image=image, file_name=file_name, transforms=transforms, thresholds=self.get_thresholds('./checkpoints/dino_thresholds.json'))
         else:
             return NotImplementedError
     
@@ -661,7 +676,9 @@ class RandomAugmentation():
         return [aug]
 
     def _append_standard_transform(self):
-        aug = BoundingboxAugmentation(algorithm='dino')
+        name = str(self.augmentations[0].name)
+        weather = str(self.augmentations[0].weather)
+        aug = BoundingboxAugmentation(algorithm='dino', augmentation=name + weather)
         return [aug]
     
 
@@ -699,7 +716,9 @@ class GANTransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/home/rothmeier/Documents/datasets/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        self.severity = random.randint(0, 2)
+        #self.severity = 0
+        path = os.path.join('/home/mayara/datasets/itsc/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
@@ -731,7 +750,9 @@ class MGIETransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        self.severity = random.randint(0, 2)
+        #self.severity = 0
+        path = os.path.join('/home/mayara/datasets/itsc/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)

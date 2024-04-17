@@ -8,6 +8,8 @@ from detectron2.checkpoint import DetectionCheckpointer
 import detectron2.utils.comm as comm
 from detectron2.evaluation import verify_results
 import torch.multiprocessing as mp
+import os
+import json
 
 
 def setup_frcnn(args):
@@ -47,13 +49,62 @@ def randaug(cfg, args):
             trainer.resume_or_load(resume=args.resume)
             trainer.train()
 
-def diffusion_search(cfg, args):  
-    sampler = TransformSampler(cfg, epochs=args.epochs)
+def add_augmentation_num_bb_json(augmentation, id, network):
+    file_path = './output/num_bb.json'
+    try:
+        with open(file_path, 'r') as file:
+            existing_data = json.load(file)
+    except FileNotFoundError:
+        existing_data = {}  # Create empty dictionary if file doesn't exist
 
-    for augmentation in sampler.diffusion_search():
-        trainer = RandTrainer(cfg, augmentation=augmentation) 
-        trainer.resume_or_load(resume=args.resume)
-        trainer.train()
+    new_structure = {
+        str(id)+network+str(augmentation): [
+            {
+                'large_bb': {
+                    'total': 0,
+                    'removed': 0
+                }
+            },
+            {
+                'medium_bb': {
+                    'total': 0,
+                    'removed': 0
+                }
+            },
+            {
+                'small_bb': {
+                    'total': 0,
+                    'removed': 0
+                }
+            }
+        ]
+    }
+
+    # Update existing data with new structure
+    existing_data.update(new_structure)
+
+    # Write updated data back to the file
+    with open(file_path, 'w') as file:
+        json.dump(existing_data, file, indent=4)
+
+def diffusion_search(args):  
+    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet] 
+    #setup_funcs = [setup_frcnn]
+    iterations = 3
+    for i in range(iterations): 
+        for setup_func in setup_funcs: 
+            cfg = setup_func(args) 
+            cfg.box_postprocessing = True 
+            default_setup(cfg, args) # Set the configuration parameters 
+            cfg.aug_prob = 1.0 
+            cfg.rand_N = 1 
+            cfg.rand_M = 0 
+            sampler = TransformSampler(cfg, epochs=args.epochs) 
+            for augmentation in sampler.diffusion_search(): 
+                add_augmentation_num_bb_json(augmentation, i, cfg.network)
+                trainer = RandTrainer(cfg, augmentation=augmentation) 
+                trainer.resume_or_load(resume=args.resume) 
+                trainer.train()
 
 def inference(cfg, args):
     model = RandTrainer.build_model(cfg)
@@ -65,21 +116,9 @@ def inference(cfg, args):
     return res
 
 def main(args):
-        #setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
-        setup_funcs = [setup_frcnn]
-        #cfg = setup_frcnn(args)
-        #cfg = setup_detr(args)
-        #cfg = setup_retinanet(args)
+    diffusion_search(args)
 
-        for setup_func in setup_funcs:
-            cfg = setup_func(args)
-            #cfg.SOLVER.BASE_LR = lr
-            cfg.box_postprocessing = True
-            cfg.rand_N = 2 # number of transforms
-            cfg.rand_M = 0 # magnitude of transforms
-            default_setup(cfg, args)
 
-            diffusion_search(cfg, args)
 
 def add_arguments():
     parser = default_argument_parser()
@@ -89,6 +128,7 @@ def add_arguments():
 
 
 if __name__ == "__main__":
+    #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     args = add_arguments().parse_args()
     mp.set_start_method('spawn')
     print("Command Line Args:", args)
