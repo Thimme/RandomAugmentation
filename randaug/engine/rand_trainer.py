@@ -336,6 +336,7 @@ class RandTrainer(TrainerBase):
                 results_a = flatten_results_dict(results_i.copy())
                 results_a["augmentation"] = augmentation
                 results_a["dataset"] = dataset_name
+                results_a["algorithm"] = cfg.network
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:

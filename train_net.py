@@ -14,7 +14,7 @@ def setup_frcnn(args):
     cfg.dataroot = args.dataroot
     cfg.merge_from_file("configs/fasterrcnn.yaml")
     cfg.eval_output = "./evaluation"
-    cfg.network = 'frcnn'
+    cfg.network = 'fasterrcnn'
     return cfg
 
 def setup_detr(args):
@@ -53,22 +53,25 @@ def add_arguments():
 
 def no_augmentation(args):
     setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
-    for setup_func in setup_funcs:
-        cfg = setup_func(args)
-        cfg.aug_prob = 1.0
-        cfg.rand_N = 2 # number of transforms
-        cfg.rand_M = 2 # magnitude of transforms
+    iterations = 1
 
-        cfg.box_postprocessing = False
-        default_setup(cfg, args)
-        
-        sampler = TransformSampler(cfg, epochs=args.epochs)
+    for _ in range(iterations):
+        for setup_func in setup_funcs:
+            cfg = setup_func(args)
+            cfg.aug_prob = 1.0
+            cfg.rand_N = 2 # number of transforms
+            cfg.rand_M = 2 # magnitude of transforms
 
-        for augmentation in sampler.no_augmentation():
-            trainer = RandTrainer(cfg, augmentation=augmentation) 
-            trainer.resume_or_load(resume=args.resume)
-            trainer.train()
+            cfg.box_postprocessing = False
+            default_setup(cfg, args)
+            
             sampler = TransformSampler(cfg, epochs=args.epochs)
+
+            for augmentation in sampler.no_augmentation():
+                trainer = RandTrainer(cfg, augmentation=augmentation) 
+                trainer.resume_or_load(resume=args.resume)
+                trainer.train()
+                sampler = TransformSampler(cfg, epochs=args.epochs)
                 
 def finetune(args):
     lrs = [1e-3, 1e-4, 1e-5, 1e-6]
@@ -167,7 +170,7 @@ def grid_search(cfg, args):
 
 
 def diffusion_search(args):
-    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+    setup_funcs = [setup_frcnn]#, setup_detr, setup_retinanet]
     iterations = 3
 
     for _ in range(iterations):
@@ -177,7 +180,7 @@ def diffusion_search(args):
             default_setup(cfg, args)
 
             # Set the configuration parameters
-            cfg.aug_prob = 1.0
+            cfg.aug_prob = 0.8
             cfg.rand_N = 1
             cfg.rand_M = 0
 

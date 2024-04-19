@@ -145,7 +145,6 @@ if __name__ == "__main__":
                     img2 = Image.fromarray(vis.get_image())
                     img1 = Image.open(os.path.join(args.data, file_id + '.jpg')) # original file path
                     img1 = center_crop_and_resize(img1, img2)
-                    print(img2.format)
                     concat_image = concat_h(img1, img2)
                     concat_image.save(os.path.join(dirname, file_id + '.jpg'))
                 else:

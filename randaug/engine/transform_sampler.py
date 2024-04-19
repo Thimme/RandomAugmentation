@@ -10,12 +10,12 @@ from fvcore.transforms.transform import NoOpTransform
 from itertools import product
 
 gan_transforms = [
-    "CycleGANFogAugmentation",
-    "CycleGANRainAugmentation",
-    "CycleGANSnowAugmentation",
-    "CUTFogAugmentation",
-    "CUTRainAugmentation",
-    "CUTSnowAugmentation",
+    #"CycleGANFogAugmentation",
+    #"CycleGANRainAugmentation",
+    #"CycleGANSnowAugmentation",
+    #"CUTFogAugmentation",
+    #"CUTRainAugmentation",
+    #"CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
@@ -25,9 +25,9 @@ diffusion_transforms = [
     #"CycleDiffusionFogAugmentation",
     #"CycleDiffusionRainAugmentation",
     #"CycleDiffusionSnowAugmentation",
-    #"MGIEDiffusionFogAugmentation",
-    #"MGIEDiffusionRainAugmentation",
-    #"MGIEDiffusionSnowAugmentation",
+    "MGIEDiffusionFogAugmentation",
+    "MGIEDiffusionRainAugmentation",
+    "MGIEDiffusionSnowAugmentation",
     #"PlugPlayFogAugmentation",
     #"PlugPlayRainAugmentation",
     #"PlugPlaySnowAugmentation",

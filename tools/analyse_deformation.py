@@ -1,0 +1,225 @@
+#!/usr/bin/env python
+# Copyright (c) Facebook, Inc. and its affiliates.
+import sys
+sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation/") # bad code
+
+import argparse
+import os
+import cv2
+import tqdm
+
+from detectron2.config import get_cfg
+from detectron2.utils.logger import setup_logger
+from detectron2 import model_zoo
+from detectron2.engine import DefaultPredictor
+from detectron2.config import get_cfg
+from detectron2.utils.visualizer import Visualizer
+from detectron2.data import MetadataCatalog, DatasetCatalog
+from PIL import Image
+from tqdm import tqdm
+from randaug.data.datasets.yolo import load_annotation
+
+
+def setup_model(args):
+    cfg = get_cfg()
+    # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
+    cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+    # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
+    predictor = DefaultPredictor(cfg)
+    return predictor, cfg
+
+
+def parse_args(in_args=None):
+    parser = argparse.ArgumentParser(description="Visualize ground-truth data")
+    parser.add_argument(
+        "--source",
+        choices=["annotation", "dataloader"],
+        required=True,
+        help="visualize the annotations or the data loader (with pre-processing)",
+    )
+    parser.add_argument("--config-file", metavar="FILE", help="path to config file")
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-d0','--dir0', type=str, default='./imgs/reference')
+    parser.add_argument('-d1','--dir1', type=str, default='./imgs/augmented')
+    parser.add_argument('-aug', '--augmentation', type=str)
+    return parser.parse_args(in_args)
+    
+
+class BBoxEvaluator():
+
+    def __init__(self, threshold, threshold_modified) -> None:
+        self.keep_s, self.keep_m, self.keep_l = 0, 0, 0
+        self.modify_s, self.modify_m, self.modify_l = 0, 0, 0
+        self.remove_s, self.remove_m, self.remove_l = 0, 0, 0
+        self.threshold = threshold
+        self.threshold_modified = threshold_modified
+
+    def evaluate(self, augmentation):
+        total_s = self.keep_s + self.modify_s + self.remove_s
+        total_m = self.keep_m + self.modify_m + self.remove_m
+        total_l = self.keep_l + self.modify_l + self.remove_l
+
+        results = [(self.keep_s / total_s),
+                   (self.modify_s / total_s),
+                   (self.remove_s / total_s),
+                   (self.keep_m / total_m),
+                   (self.modify_m / total_m),
+                   (self.remove_m / total_m),
+                   (self.keep_l / total_l),
+                   (self.modify_l / total_l),
+                   (self.remove_l / total_l)]
+        results = [f'{x:.3f}' for x in results]
+        results.insert(0, augmentation)
+        results = ','.join(results) # type: ignore
+        
+        with open("out.txt", "a") as f:
+            f.writelines(results)
+        
+        f.close()
+
+
+    def compare_to_label(self, output, label):
+        boxes_output = get_bboxes(output)
+        boxes_gt = get_gt_boxes(label)
+        self.compare(boxes_gt, boxes_output)
+
+    def compare_to_image(self, original, augmented):
+        boxes_original = get_bboxes(original)
+        boxes_augmented = get_bboxes(augmented)
+        self.compare(boxes_original, boxes_augmented)
+
+    def compare(self, boxes1, boxes2):
+        for box1 in boxes1:
+            for box2 in boxes2:
+                iou = bb_intersection_over_union(box1, box2)
+                self.increase_num_boxes(iou, box1)
+    
+    def get_bb_area(self, box):
+        width = box[2] - box[0] 
+        height = box[3] - box[1]
+        return width * height 
+    
+    def increase_num_boxes(self, iou, box):
+        area = self.get_bb_area(box)
+
+        if area < 32**2:
+            if iou > self.threshold:
+                self.keep_s += 1
+            elif iou > self.threshold_modified:
+                self.modify_s +=1
+            else:
+                self.remove_s += 1
+        elif area >= 32**2 and area < 96**2:
+            if iou > self.threshold:
+                self.keep_m += 1
+            elif iou > self.threshold_modified:
+                self.modify_m +=1
+            else:
+                self.remove_m += 1
+        else:
+            if iou > self.threshold:
+                self.keep_l += 1
+            elif iou > self.threshold_modified:
+                self.modify_l +=1
+            else:
+                self.remove_l += 1
+    
+def get_bboxes(data):
+    data = data['instances'].to('cpu')
+    pred_classes =  data.pred_classes.tolist()
+    pred_boxes = [box.tolist() for box in data.pred_boxes]
+    vehicle_boxes = []
+    for i, detection in enumerate(pred_classes):
+        if detection == 2:
+            vehicle_boxes.append(pred_boxes[i])
+    return vehicle_boxes
+
+def get_gt_boxes(data):
+    bboxes = [annotation.bbox for annotation in data.annotations]
+    return bboxes
+    
+def center_crop_and_resize(image_to_modify, target_image):
+    target_width, target_height = target_image.size
+    target_aspect = target_width / target_height
+    orig_width, orig_height = image_to_modify.size
+    orig_aspect = orig_width / orig_height
+    
+    # Center crop to the correct aspect ratio
+    if orig_aspect > target_aspect:
+        # If the original image is wider than the target, crop the left and right edges
+        new_width = int(orig_height * target_aspect)
+        left = (orig_width - new_width) / 2
+        crop_rectangle = (left, 0, left + new_width, orig_height)
+    else:
+        # If the original image is taller than the target, crop the top and bottom edges
+        new_height = int(orig_width / target_aspect)
+        top = (orig_height - new_height) / 2
+        crop_rectangle = (0, top, orig_width, top + new_height)
+    
+    cropped_image = image_to_modify.crop(crop_rectangle)
+    resized_image = cropped_image.resize((target_width, target_height), Image.ANTIALIAS)
+    return resized_image
+
+def bb_intersection_over_union(boxA, boxB):
+	# determine the (x, y)-coordinates of the intersection rectangle
+	xA = max(boxA[0], boxB[0])
+	yA = max(boxA[1], boxB[1])
+	xB = min(boxA[2], boxB[2])
+	yB = min(boxA[3], boxB[3])
+	# compute the area of intersection rectangle
+	interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+	# compute the area of both the prediction and ground-truth
+	# rectangles
+	boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+	boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+	# compute the intersection over union by taking the intersection
+	# area and dividing it by the sum of prediction + ground-truth
+	# areas - the interesection area
+	iou = interArea / float(boxAArea + boxBArea - interArea)
+	# return the intersection over union value
+	return iou
+
+
+if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    args = parse_args()
+    logger = setup_logger()
+    logger.info("Arguments: " + str(args))
+    model, cfg = setup_model(args)
+
+    metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
+    reference_images = os.listdir(os.path.join(args.dir0, 'images'))
+    reference_labels = os.listdir(os.path.join(args.dir0, 'labels'))
+    augmented_images = os.listdir(args.dir1)
+    ending = os.path.splitext(os.listdir(args.dir1)[0])[-1].lower()  
+
+    bb_eval_label_orig = BBoxEvaluator(threshold=0.5, threshold_modified=0.2)
+    bb_eval_label_aug = BBoxEvaluator(threshold=0.5, threshold_modified=0.2)
+    bb_eval_orig_aug = BBoxEvaluator(threshold=0.5, threshold_modified=0.2)
+
+    for file in tqdm(reference_images):
+        path0 = os.path.join(args.dir0, 'images', file)
+        path1 = os.path.join(args.dir1, file)
+        file_path = os.path.join(args.dir0, 'images', file)
+        label_path = os.path.join(args.dir0, 'labels', file)[:-4] + '.txt'
+        label = load_annotation(file_path, label_path)
+        
+        if os.path.exists(path0):
+            path1 = path1[:-4] + ending
+        
+            image1 = cv2.imread(path0)
+            image2 = cv2.imread(path1)
+
+            original = model(image1)
+            augmented = model(image2)
+
+            bb_eval_label_orig.compare_to_label(original, label)
+            bb_eval_label_aug.compare_to_label(augmented, label)
+            bb_eval_orig_aug.compare_to_image(original, augmented)
+
+
+    bb_eval_label_orig.evaluate(args.augmentation)
+    bb_eval_label_aug.evaluate(args.augmentation)
+    bb_eval_orig_aug.evaluate(args.augmentation)
