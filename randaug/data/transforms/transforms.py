@@ -678,7 +678,7 @@ class RandomAugmentation():
     def _append_standard_transform(self):
         name = str(self.augmentations[0].name)
         weather = str(self.augmentations[0].weather)
-        aug = BoundingboxAugmentation(algorithm='dino', augmentation=name + weather)
+        aug = BoundingboxAugmentation(algorithm='clip', augmentation=name + weather)
         return [aug]
     
 
@@ -718,7 +718,7 @@ class GANTransform(Transform):
         filename_jpg = f'{filename[:-4]}.jpg'
         self.severity = random.randint(0, 2)
         #self.severity = 0
-        path = os.path.join('/home/mayara/datasets/itsc/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
@@ -752,7 +752,7 @@ class MGIETransform(Transform):
         filename_jpg = f'{filename[:-4]}.jpg'
         self.severity = random.randint(0, 2)
         #self.severity = 0
-        path = os.path.join('/home/mayara/datasets/itsc/adverse/augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)

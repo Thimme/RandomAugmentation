@@ -50,7 +50,7 @@ def randaug(cfg, args):
             trainer.train()
 
 def add_augmentation_num_bb_json(augmentation, id, network):
-    file_path = './output/num_bb.json'
+    file_path = './output/boxes/num_bb.json'
     try:
         with open(file_path, 'r') as file:
             existing_data = json.load(file)
@@ -90,7 +90,7 @@ def add_augmentation_num_bb_json(augmentation, id, network):
 def diffusion_search(args):  
     setup_funcs = [setup_frcnn, setup_detr, setup_retinanet] 
     #setup_funcs = [setup_frcnn]
-    iterations = 3
+    iterations = 2
     for i in range(iterations): 
         for setup_func in setup_funcs: 
             cfg = setup_func(args) 

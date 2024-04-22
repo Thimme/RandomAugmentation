@@ -14,6 +14,7 @@ from randaug.data.classifier.classifier import SimpleClassifier
 from randaug.data.classifier.clip import CLIPClassifier
 from randaug.data.classifier.dino import DINOClassifier
 from detectron2.data import detection_utils as utils
+import portalocker
 
 import yaml
 import json
@@ -171,24 +172,39 @@ class CLIPBBTransform(Transform):
             return 'large_bb'
 
     def update_num_bb_json(self, box_size, type):
-        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2} 
-        json_path = './output/num_bb.json'
-        with open(json_path, 'r') as file:
-            json_data = json.load(file) 
+        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2}
+        json_path = './output/boxes/num_bb.json'
 
-        model = list(json_data.keys())[-1] #last model is the one used now
-        box_size_index = dict_box_size[box_size]
+        try:
+            # Attempt to read the JSON file with an exclusive lock
+            with open(json_path, 'r+') as file:
+                portalocker.lock(file, portalocker.LOCK_EX)  # Lock the file for exclusive access
+                json_data = json.load(file)
 
-        json_data[model][box_size_index][box_size][type] = json_data[model][box_size_index][box_size][type] + 1
+                # Data processing
+                model = list(json_data.keys())[-1]  # Last model is currently used
+                box_size_index = dict_box_size[box_size]
+                json_data[model][box_size_index][box_size][type] += 1
+                updated_json_string = json.dumps(json_data, indent=4)
 
-        updated_json_string = json.dumps(json_data, indent=4)
+                # Move back to the beginning and truncate the file to overwrite
+                file.seek(0)
+                file.truncate()
+                file.write(updated_json_string)
 
-        with open(json_path, 'w') as file:
-            file.write(updated_json_string)
-    
+                # The file is automatically unlocked when exiting the 'with' block
+
+        except json.JSONDecodeError as e:
+            print(f"Error reading JSON data: {e}")
+        except IOError as e:
+            print(f"File I/O error: {e}")
+
+
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         box_size = self.calculate_box_size(box)
-        self.update_num_bb_json(box_size, 'total')
+        
+        if comm.is_main_process():
+            self.update_num_bb_json(box_size, 'total')
 
         threshold = self.thresholds[box_size]
 
@@ -197,7 +213,8 @@ class CLIPBBTransform(Transform):
         
         try:
             if self._predict(self.image, box) < threshold:
-                self.update_num_bb_json(box_size, 'removed')
+                if comm.is_main_process():
+                    self.update_num_bb_json(box_size, 'removed')
                 return self._invalidate_bbox()     
             else:
                 #print('manteve')
@@ -253,20 +270,33 @@ class DINOBBTransform(Transform):
             return 'large_bb'
 
     def update_num_bb_json(self, box_size, type):
-        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2} 
-        json_path = './output/num_bb.json'
-        with open(json_path, 'r') as file:
-            json_data = json.load(file) 
+        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2}
+        json_path = './output/boxes/num_bb.json'
 
-        model = list(json_data.keys())[-1] #last model is the one used now
-        box_size_index = dict_box_size[box_size]
+        try:
+            # Attempt to read the JSON file with an exclusive lock
+            with open(json_path, 'r+') as file:
+                portalocker.lock(file, portalocker.LOCK_EX)  # Lock the file for exclusive access
+                json_data = json.load(file)
 
-        json_data[model][box_size_index][box_size][type] = json_data[model][box_size_index][box_size][type] + 1
+                # Data processing
+                model = list(json_data.keys())[-1]  # Last model is currently used
+                box_size_index = dict_box_size[box_size]
+                json_data[model][box_size_index][box_size][type] += 1
+                updated_json_string = json.dumps(json_data, indent=4)
 
-        updated_json_string = json.dumps(json_data, indent=4)
+                # Move back to the beginning and truncate the file to overwrite
+                file.seek(0)
+                file.truncate()
+                file.write(updated_json_string)
 
-        with open(json_path, 'w') as file:
-            file.write(updated_json_string)
+                # The file is automatically unlocked when exiting the 'with' block
+
+        except json.JSONDecodeError as e:
+            print(f"Error reading JSON data: {e}")
+        except IOError as e:
+            print(f"File I/O error: {e}")
+
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
 
