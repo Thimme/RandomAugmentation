@@ -1,14 +1,17 @@
 #!/bin/bash
 
+# test
+#python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/reference/noboxes/images --augmentation test 
+
 # cyclegan
-python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cyclegan/fog/ --augmentation cycleganfog 
-python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cyclegan/rain/ --augmentation cycleganrain 
-python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cyclegan/snow/ --augmentation cyclegansnow 
+python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cyclegan/0/fog/ --augmentation cycleganfog 
+python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cyclegan/0/rain/ --augmentation cycleganrain 
+python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cyclegan/0/snow/ --augmentation cyclegansnow 
 
 # cut
-python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cut/fog/ --augmentation cutfog  
-python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cut/rain/ --augmentation cutrain  
-python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cut/snow/ --augmentation cutsnow  
+python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cut/0/fog/ --augmentation cutfog  
+python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cut/0/rain/ --augmentation cutrain  
+python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/cut/0/snow/ --augmentation cutsnow  
 
 # plugplay
 python tools/analyse_deformation.py -d0 /mnt/ssd2/dataset/reference/noboxes/ -d1 /mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation/plugplay_diffusion/0/fog/ --augmentation plugplayfog 
