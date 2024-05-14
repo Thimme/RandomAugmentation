@@ -39,8 +39,9 @@ def main(args):
     #finetune(args)
     #no_augmentation(args)
     #randaug_weather(args)
+    randaug_bb_estimation(args)
     #data_split(args)
-    diffusion_search(args)
+    #diffusion_search(args)
 
 
 def add_arguments():
@@ -123,6 +124,26 @@ def randaug_weather(args):
         for setup_func in setup_funcs:
             cfg = setup_func(args)
             cfg.box_postprocessing = False
+            default_setup(cfg, args)
+
+            # Set the configuration parameters
+            cfg.aug_prob = 1.0
+            cfg.rand_N = 2
+            cfg.rand_M = 1
+
+            trainer = RandTrainer(cfg, augmentation=None)
+            trainer.resume_or_load(resume=args.resume)
+            trainer.train()
+
+
+def randaug_bb_estimation(args):
+    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+    iterations = 3
+
+    for _ in range(iterations):
+        for setup_func in setup_funcs:
+            cfg = setup_func(args)
+            cfg.box_postprocessing = True
             default_setup(cfg, args)
 
             # Set the configuration parameters

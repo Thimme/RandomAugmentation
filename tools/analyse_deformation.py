@@ -164,28 +164,6 @@ def get_bboxes(data):
 def get_gt_boxes(data):
     bboxes = [annotation.bbox for annotation in data.annotations]
     return bboxes
-    
-def center_crop_and_resize(image_to_modify, target_image):
-    target_width, target_height = target_image.size
-    target_aspect = target_width / target_height
-    orig_width, orig_height = image_to_modify.size
-    orig_aspect = orig_width / orig_height
-    
-    # Center crop to the correct aspect ratio
-    if orig_aspect > target_aspect:
-        # If the original image is wider than the target, crop the left and right edges
-        new_width = int(orig_height * target_aspect)
-        left = (orig_width - new_width) / 2
-        crop_rectangle = (left, 0, left + new_width, orig_height)
-    else:
-        # If the original image is taller than the target, crop the top and bottom edges
-        new_height = int(orig_width / target_aspect)
-        top = (orig_height - new_height) / 2
-        crop_rectangle = (0, top, orig_width, top + new_height)
-    
-    cropped_image = image_to_modify.crop(crop_rectangle)
-    resized_image = cropped_image.resize((target_width, target_height), Image.ANTIALIAS)
-    return resized_image
 
 def bb_intersection_over_union(boxA, boxB):
 	# determine the (x, y)-coordinates of the intersection rectangle
