@@ -188,7 +188,7 @@ class CLIPBBTransform(Transform):
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
         box_size = self.calculate_box_size(box)
-        self.update_num_bb_json(box_size, 'total')
+        #self.update_num_bb_json(box_size, 'total')
 
         threshold = self.thresholds[box_size]
 
@@ -197,7 +197,7 @@ class CLIPBBTransform(Transform):
         
         try:
             if self._predict(self.image, box) < threshold:
-                self.update_num_bb_json(box_size, 'removed')
+                #self.update_num_bb_json(box_size, 'removed')
                 return self._invalidate_bbox()     
             else:
                 #print('manteve')
@@ -225,14 +225,12 @@ class CLIPBBTransform(Transform):
 # trained with classificator on images in bounding boxes
 class DINOBBTransform(Transform):
 
-    def __init__(self, image: np.ndarray, file_name: str, transforms: list, thresholds = None):
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list, augmentation = None, thresholds = None):
         super().__init__()
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
         self.model = DINOClassifier(device = self.device)#.to(self.device)
-        self.num_bb = 0
-        self.num_bb_removed = 0
-        #self.threshold = 0.005
+        self.augmentation = augmentation.replace("_", "")
         self.thresholds = thresholds 
 
     def apply_image(self, img: np.ndarray):
@@ -253,15 +251,22 @@ class DINOBBTransform(Transform):
             return 'large_bb'
 
     def update_num_bb_json(self, box_size, type):
-        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2} 
         json_path = './output/num_bb.json'
+        
+        if not (os.path.isfile(json_path)):
+            return 
+        
         with open(json_path, 'r') as file:
             json_data = json.load(file) 
 
-        model = list(json_data.keys())[-1] #last model is the one used now
-        box_size_index = dict_box_size[box_size]
-
-        json_data[model][box_size_index][box_size][type] = json_data[model][box_size_index][box_size][type] + 1
+        for key in reversed(list(json_data.keys())): # reverse to get the last occurance of the augmentation
+            if self.augmentation in key:
+                values = json_data[key]
+                for sizes in values:
+                    for key, value in sizes.items(): #total or removed
+                        if key == box_size:
+                            value[type] = value[type] + 1
+                break #do this to not update all the occurances of this augmentation, only the last one
 
         updated_json_string = json.dumps(json_data, indent=4)
 

@@ -57,8 +57,16 @@ def add_augmentation_num_bb_json(augmentation, id, network):
     except FileNotFoundError:
         existing_data = {}  # Create empty dictionary if file doesn't exist
 
+    if augmentation == None:
+        aug_name = 'mix'
+    else:
+        # clear augmentation name
+        aug_name = str(augmentation).lower()
+        aug_name = ''.join(filter(str.isalpha, aug_name))
+        aug_name = aug_name.replace('augmentation', '')
+
     new_structure = {
-        str(id)+network+str(augmentation): [
+        str(id)+network+ '-' +aug_name: [
             {
                 'large_bb': {
                     'total': 0,
@@ -89,12 +97,12 @@ def add_augmentation_num_bb_json(augmentation, id, network):
 
 def diffusion_search(args):  
     setup_funcs = [setup_frcnn, setup_detr, setup_retinanet] 
-    #setup_funcs = [setup_frcnn]
     iterations = 3
     for i in range(iterations): 
         for setup_func in setup_funcs: 
             cfg = setup_func(args) 
             cfg.box_postprocessing = True 
+            cfg.estimator = 'dino'
             default_setup(cfg, args) # Set the configuration parameters 
             cfg.aug_prob = 1.0 
             cfg.rand_N = 1 
@@ -106,6 +114,22 @@ def diffusion_search(args):
                 trainer.resume_or_load(resume=args.resume) 
                 trainer.train()
 
+def gan_diffusion_search(args):  
+    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet] 
+    iterations = 3
+    for i in range(iterations): 
+        for setup_func in setup_funcs: 
+            cfg = setup_func(args) 
+            cfg.box_postprocessing = True 
+            cfg.estimator = 'dino'
+            default_setup(cfg, args) # Set the configuration parameters 
+            cfg.aug_prob = 1.0 
+            cfg.rand_N = 1 
+            cfg.rand_M = 0 
+            trainer = RandTrainer(cfg, augmentation=None) 
+            trainer.resume_or_load(resume=args.resume) 
+            trainer.train()
+
 def inference(cfg, args):
     model = RandTrainer.build_model(cfg)
 
@@ -116,7 +140,8 @@ def inference(cfg, args):
     return res
 
 def main(args):
-    diffusion_search(args)
+    gan_diffusion_search(args)
+    #diffusion_search(args)
 
 
 

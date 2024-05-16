@@ -29,7 +29,7 @@ from detectron2.solver.build import maybe_add_gradient_clipping
 from randaug.data.transforms import transforms as W
 from randaug.utils.results_writer import JSONResultsWriter
 from randaug.data.dataset_mapper import MyDatasetMapper, RandAugmentDatasetMapper
-from randaug.engine.transform_sampler import RandomSampler
+from randaug.engine.transform_sampler import RandomSampler, RandomSamplerGANDiffusion
 
 
 class RandTrainer(TrainerBase):
@@ -273,7 +273,8 @@ class RandTrainer(TrainerBase):
     
     @classmethod
     def build_rand_augment_train_loader(cls, cfg):
-        sampler = RandomSampler(cfg=cfg, device=f'cuda:{comm.get_rank()}')
+        #sampler = RandomSampler(cfg=cfg, device=f'cuda:{comm.get_rank()}')
+        sampler = RandomSamplerGANDiffusion(cfg=cfg, device=f'cuda:{comm.get_rank()}')
         mapper = RandAugmentDatasetMapper(cfg, is_train=True, sampler=sampler) # type: ignore
         return build_detection_train_loader(cfg, mapper=mapper)
     

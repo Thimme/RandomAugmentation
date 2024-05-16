@@ -48,6 +48,7 @@ class CLIPClassifier(nn.Module):
         return model, preprocess
 
     def forward(self, x):
+        print('clip')
         x = self.preprocess(x).unsqueeze(0).to(self.device)
 
         with torch.no_grad():

@@ -615,7 +615,7 @@ class CutoutAugmentation(T.Augmentation):
 class BoundingboxAugmentation(T.Augmentation):
     
     def __init__(self, algorithm=None, cfg=None, augmentation=None):
-        self.algorithm = algorithm
+        self.algorithm = algorithm 
         self.cfg = cfg
         self.augmentation = augmentation
 
@@ -644,7 +644,7 @@ class BoundingboxAugmentation(T.Augmentation):
         elif self.algorithm == 'clip':
             return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms, thresholds=self.get_thresholds('./checkpoints/clip_thresholds.json'))
         elif self.algorithm == 'dino':
-            return DINOBBTransform(image=image, file_name=file_name, transforms=transforms, thresholds=self.get_thresholds('./checkpoints/dino_thresholds.json'))
+            return DINOBBTransform(image=image, file_name=file_name, transforms=transforms, augmentation=self.augmentation, thresholds=self.get_thresholds('./checkpoints/dino_thresholds.json'))
         else:
             return NotImplementedError
     
@@ -652,10 +652,11 @@ class BoundingboxAugmentation(T.Augmentation):
 # Wrapper class for random augmentations
 class RandomAugmentation():
     
-    def __init__(self, cfg, M, augmentations):
+    def __init__(self, cfg, M, augmentations, estimator):
         self.cfg = cfg
         self.M = M # list of magnitudes
         self.augmentations = augmentations # list of transforms
+        self.estimator = estimator
     
     def __repr__(self):
         if len(self.augmentations):
@@ -678,7 +679,7 @@ class RandomAugmentation():
     def _append_standard_transform(self):
         name = str(self.augmentations[0].name)
         weather = str(self.augmentations[0].weather)
-        aug = BoundingboxAugmentation(algorithm='dino', augmentation=name + weather)
+        aug = BoundingboxAugmentation(algorithm=self.estimator, augmentation=name + weather)
         return [aug]
     
 
