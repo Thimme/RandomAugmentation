@@ -50,7 +50,7 @@ def randaug(cfg, args):
             trainer.train()
 
 def add_augmentation_num_bb_json(augmentation, id, network):
-    file_path = './output/num_bb.json'
+    file_path = './output/boxes/num_bb.json'
     try:
         with open(file_path, 'r') as file:
             existing_data = json.load(file)
