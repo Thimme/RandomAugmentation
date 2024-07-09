@@ -138,7 +138,7 @@ def randaug_weather(args):
 
 def randaug_bb_estimation(args):
     setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
-    iterations = 3
+    iterations = 2
 
     for _ in range(iterations):
         for setup_func in setup_funcs:
@@ -148,7 +148,7 @@ def randaug_bb_estimation(args):
 
             # Set the configuration parameters
             cfg.aug_prob = 1.0
-            cfg.rand_N = 2
+            cfg.rand_N = 3
             cfg.rand_M = 1
 
             trainer = RandTrainer(cfg, augmentation=None)

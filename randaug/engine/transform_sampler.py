@@ -10,38 +10,38 @@ from fvcore.transforms.transform import NoOpTransform
 from itertools import product
 
 gan_transforms = [
-    #"CycleGANFogAugmentation",
-    #"CycleGANRainAugmentation",
-    #"CycleGANSnowAugmentation",
-    #"CUTFogAugmentation",
-    #"CUTRainAugmentation",
-    #"CUTSnowAugmentation",
+    "CycleGANFogAugmentation",
+    "CycleGANRainAugmentation",
+    "CycleGANSnowAugmentation",
+    "CUTFogAugmentation",
+    "CUTRainAugmentation",
+    "CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
-    #"StableDiffusionFogAugmentation",
-    #"StableDiffusionRainAugmentation",
-    #"StableDiffusionSnowAugmentation",
-    #"CycleDiffusionFogAugmentation",
-    #"CycleDiffusionRainAugmentation",
-    #"CycleDiffusionSnowAugmentation",
+    "StableDiffusionFogAugmentation",
+    "StableDiffusionRainAugmentation",
+    "StableDiffusionSnowAugmentation",
+    "CycleDiffusionFogAugmentation",
+    "CycleDiffusionRainAugmentation",
+    "CycleDiffusionSnowAugmentation",
     "MGIEDiffusionFogAugmentation",
     "MGIEDiffusionRainAugmentation",
     "MGIEDiffusionSnowAugmentation",
-    #"PlugPlayFogAugmentation",
-    #"PlugPlayRainAugmentation",
-    #"PlugPlaySnowAugmentation",
-    #"ControlNetFogAugmentation",
-    #"ControlNetRainAugmentation",
-    #"ControlNetSnowAugmentation",
+    # "PlugPlayFogAugmentation",
+    # "PlugPlayRainAugmentation",
+    # "PlugPlaySnowAugmentation",
+    # "ControlNetFogAugmentation",
+    # "ControlNetRainAugmentation",
+    # "ControlNetSnowAugmentation",
 ]
 
 ai_transforms = [
-    #"CycleGAN",
-    #"CUT",
-    #"StableDiffusion",
-    #"CycleDiffusion",
-    #"MGIEDiffusion",
+    "CycleGAN",
+    "CUT",
+    "StableDiffusion",
+    "CycleDiffusion",
+    "MGIEDiffusion",
 ]
 
 ai_conditions = [
@@ -51,25 +51,25 @@ ai_conditions = [
 ]
 
 image_transforms = [
-    #"ColorAugmentation",
-    #"ShearXAugmentation",
-    #"ShearYAugmentation",
-    #"FogAugmentation",
-    #"SnowAugmentation",
+    "ColorAugmentation",
+    "ShearXAugmentation",
+    "ShearYAugmentation",
+    "FogAugmentation",
+    "SnowAugmentation",
     "RainAugmentation",
-    #"TranslateXAugmentation",
-    #"TranslateYAugmentation",
-    #"AutoContrastAugmentation",
-    #"InvertAugmentation",
-    #"EqualizeAugmentation",
-    #"SolarizeAugmentation",
-    #"PosterizeAugmentation",
-    #"ContrastAugmentation",
-    #"BrightnessAugmentation",
-    #"SharpnessAugmentation",
-    #"CutoutAugmentation",
-    #"DropAugmentation",
-    #"RotationAugmentation",
+    "TranslateXAugmentation",
+    "TranslateYAugmentation",
+    "AutoContrastAugmentation",
+    "InvertAugmentation",
+    "EqualizeAugmentation",
+    "SolarizeAugmentation",
+    "PosterizeAugmentation",
+    "ContrastAugmentation",
+    "BrightnessAugmentation",
+    "SharpnessAugmentation",
+    "CutoutAugmentation",
+    "DropAugmentation",
+    "RotationAugmentation",
     #"AutoAugmentAugmentation",
     #"RandAugmentAugmentation",
     #"TrivialWideAugmentation",
@@ -176,7 +176,7 @@ class TransformSampler():
     
     def test(self):
         #return [RandomAugmentation(self.cfg, 1, [])]
-        return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), BoundingboxAugmentation(algorithm='dino', cfg=self.cfg)])]
+        return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), ShearXAugmentation(magnitude=1, cfg=self.cfg), SnowAugmentation(magnitude=2, cfg=self.cfg)])]
     
     def diffusion_search(self):
         ops = self._sample_diffusion_models(ids=[0])
@@ -268,4 +268,12 @@ class RandomSampler():
         ops = self._reorder_ops(ops, gan_transforms + diffusion_transforms)
         ops = self._add_magnitude(ops, M)
         transforms, _ = self._map_to_transforms(ops)
+        transforms.append(T.RandomFlip(prob=0.5))
+
+        if self.cfg.box_postprocessing == True:
+            transforms.append(BoundingboxAugmentation(algorithm='dino'))
+
+        if self.cfg.save_image == True:
+            transforms.append(BoundingboxAugmentation(algorithm='generate_samples', cfg=self.cfg))
+
         return transforms

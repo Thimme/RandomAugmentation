@@ -6,6 +6,7 @@ import torchvision.transforms
 import cv2
 import uuid
 import os
+import uuid
 from detectron2.utils import comm
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from math import log10, sqrt 
@@ -190,7 +191,7 @@ class DINOBBTransform(Transform):
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
         self.model = DINOClassifier(device = self.device)
-        self.threshold = 0.05
+        self.threshold = 0.025
 
     def apply_image(self, img: np.ndarray):
         return img
@@ -318,6 +319,34 @@ class OutputBBTransform(Transform):
         print("Saving to {} ...".format(filepath))
         img.save(filepath)
 
+class SaveTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list, path: str):
+        super().__init__()
+        self.image = image # transformed image
+        self.file_name = file_name.split('/')[-1]
+        self.count = 0
+        self.path = path
+
+    def apply_image(self, img: np.ndarray):
+        self._output(img, path=self.path)
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def _output(self, img: np.ndarray, path):
+        image = Image.fromarray(img)
+        filepath = os.path.join(path, f'{self.file_name[:-4]}#{uuid.uuid4()}.jpg')
+        self.count = self.count + 1
+        #print("Saving to {} ...".format(filepath))
+        image.save(filepath)
 
 def crop_and_pad(image: np.ndarray, box, resize=True):
 

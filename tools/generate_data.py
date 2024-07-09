@@ -7,7 +7,7 @@ import argparse
 import os
 from itertools import chain
 import cv2
-import tqdm
+from tqdm import tqdm
 
 from detectron2.config import get_cfg
 from detectron2.data import DatasetCatalog, MetadataCatalog, build_detection_train_loader
@@ -17,7 +17,7 @@ from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import Visualizer
 from randaug.data import datasets
 from randaug.engine.rand_trainer import RandTrainer
-from randaug.engine.transform_sampler import TransformSampler
+from randaug.engine.transform_sampler import TransformSampler, RandomSampler
 
 
 def setup(args):
@@ -26,9 +26,12 @@ def setup(args):
         cfg.merge_from_file(args.config_file)
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.SOLVER.IMS_PER_BATCH = 1
-    cfg.rand_N = 2 # number of transforms
-    cfg.rand_M = 5 # magnitude of transforms
-    cfg.box_postprocessing = True # needs to be True
+    cfg.aug_prob = 1.0
+    cfg.rand_N = args.augmentations
+    cfg.rand_M = args.magnitude
+    cfg.box_postprocessing = False
+    cfg.save_image = True
+    cfg.save_path = f'tools/deformation_improved/{cfg.rand_N}/{cfg.rand_M}'
     cfg.freeze()
     return cfg
 
@@ -37,8 +40,10 @@ def parse_args(in_args=None):
     parser = argparse.ArgumentParser(description="Visualize ground-truth data")
     parser.add_argument("--config-file", metavar="FILE", help="path to config file")
     parser.add_argument("--output-dir", default="./", help="path to output directory")
-    parser.add_argument("--sampling_rate", type=int, default=10, help="Number of images to sample per augmentation policy")
-    parser.add_argument("--magnitude", type=int, default=0, help="Magnitude of the transforms to be applied")
+    parser.add_argument("--samples", type=int, default=5000, help="Number of images to sample per augmentation policy")
+    parser.add_argument("--augmentations", type=int, default=1, help="Number of sequential augmentations")
+    parser.add_argument("--magnitude", type=int, default=0, help="Intensity of augmentation")
+
     return parser.parse_args(in_args)
 
 
@@ -48,30 +53,24 @@ if __name__ == "__main__":
     logger.info("Arguments: " + str(args))
     cfg = setup(args)
 
-    dirname = args.output_dir
-    os.makedirs(dirname, exist_ok=True)
+    os.makedirs(cfg.save_path, exist_ok=True)
     metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
 
     def output(vis, fname):
-        filepath = os.path.join(dirname, fname)
+        filepath = os.path.join(cfg.save_path, fname)
         print("Saving to {} ...".format(filepath))
-        vis.save(filepath)            
-
-    scale = 1.0
-    sampler = TransformSampler(cfg, epochs=0)
-    transforms = sampler.sample_output(args.magnitude)
-    count = 0
+        vis.save(filepath)   
 
     # images are saved in bounding box transform pipeline
-    for t in transforms:
-        train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=t.get_transforms())
+    train_data_loader = RandTrainer.build_rand_augment_train_loader(cfg=cfg)
+    count = 0
+    pbar = tqdm(total=args.samples)
 
-        for batch in train_data_loader:
-            count = count + 1
-            if count % args.sampling_rate == 0:
-                count = 0
-                break
-            else:
-                continue
-
+    for batch in train_data_loader: # type: ignore
+        count += 1
+        pbar.update(1)
+        if count > args.samples:
+            break
+    
+    pbar.close()
 

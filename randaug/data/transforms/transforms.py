@@ -11,7 +11,7 @@ from fvcore.transforms.transform import Transform
 from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from enum import Enum
-from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform
+from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform, SaveTransform
 from torchvision import transforms as v1
 
 MAGNITUDE_BINS = 5 
@@ -546,8 +546,10 @@ class BoundingboxAugmentation(T.Augmentation):
             return AdjustBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'similarity':
             return SimilarityBBTransform(image=image, file_name=file_name, transforms=transforms)
-        elif self.algorithm == 'generate_samples':
+        elif self.algorithm == 'generate_sample_boxes':
             return OutputBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'generate_samples':
+            return SaveTransform(image=image, file_name=file_name, transforms=transforms, path=self.cfg.save_path) # type: ignore
         elif self.algorithm == 'clip':
             return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'dino':
@@ -619,7 +621,7 @@ class RandomAugmentation():
         if self.cfg.box_postprocessing == True:
             return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
         else:
-            return self.augmentations + self._append_standard_flip()
+            return self.augmentations #+ self._append_standard_flip()
     
     def _append_standard_flip(self):
         aug = T.RandomFlip(prob=0.5)
@@ -664,8 +666,8 @@ class GANTransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        #path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        # path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.weather), filename_jpg)
 
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
@@ -697,8 +699,8 @@ class MGIETransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        #path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        # path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
 
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'

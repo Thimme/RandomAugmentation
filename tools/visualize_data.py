@@ -138,6 +138,9 @@ if __name__ == "__main__":
                 img = per_image["image"].permute(1, 2, 0).cpu().detach().numpy()
                 img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
                 file_id = per_image['image_id']
+                img = Image.fromarray(img)
+                img.save(os.path.join(dirname, file_id + '.jpg'))
+                continue
                 vis = visualize_image(img, per_image["instances"])
 
                 if args.concat:

@@ -1,0 +1,22 @@
+_BASE_: "./Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "https://dl.fbaipublicfiles.com/detectron2/COCO-Detection/faster_rcnn_R_50_FPN_3x/137849458/model_final_280758.pkl"
+  MASK_ON: False
+  RESNETS:
+    DEPTH: 50
+  ROI_HEADS:
+    BATCH_SIZE_PER_IMAGE: 64
+    NUM_CLASSES: 80 # only car
+SOLVER:
+  IMS_PER_BATCH: 4
+  BASE_LR: 0.0001
+  WARMUP_ITERS: 10
+  MAX_ITER: 5000
+  GAMMA: 0.052
+DATALOADER:
+  NUM_WORKERS: 1
+TEST:
+  EVAL_PERIOD: 0
+DATASETS:
+  TRAIN: ("adverse_clear", "adverse_clear_addon_01",)
+  TEST: ("adverse_fog", "adverse_rain", "adverse_snow", "dense_clear_day", "dense_light_fog_day", "dense_light_fog_night", "dense_fog_day", "dense_fog_night", "dense_rain", "dense_snow_day", "dense_snow_night", "dawn_fog", "dawn_sand", "dawn_rain", "dawn_snow", "nuscenes_clear", "nuscenes_rain", "bdd_clear", "bdd_rain", "bdd_snow", "cityscapes_clear", "cityscapes_fog01", "cityscapes_fog02", "cityscapes_fog03", "acdc_fog", "acdc_rain", "acdc_snow", "providentia_fog", "providentia_snow", "midjourney_snow", "midjourney_rain", "midjourney_fog",)

@@ -185,6 +185,49 @@ def bb_intersection_over_union(boxA, boxB):
 	return iou
 
 
+# if __name__ == "__main__":
+#     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+#     args = parse_args()
+#     logger = setup_logger()
+#     logger.info("Arguments: " + str(args))
+#     model, cfg = setup_model(args)
+
+#     metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
+#     reference_images = os.listdir(os.path.join(args.dir0, 'images'))
+#     reference_labels = os.listdir(os.path.join(args.dir0, 'labels'))
+#     augmented_images = os.listdir(args.dir1)
+#     ending = os.path.splitext(os.listdir(args.dir1)[0])[-1].lower()  
+
+#     bb_eval_label_orig = BBoxEvaluator(threshold=0.5)
+#     bb_eval_label_aug = BBoxEvaluator(threshold=0.5)
+#     bb_eval_orig_aug = BBoxEvaluator(threshold=0.5)
+
+#     for file in tqdm(reference_images):
+#         path0 = os.path.join(args.dir0, 'images', file)
+#         path1 = os.path.join(args.dir1, file)
+#         file_path = os.path.join(args.dir0, 'images', file)
+#         label_path = os.path.join(args.dir0, 'labels', file)[:-4] + '.txt'
+#         label = load_annotation(file_path, label_path)
+        
+#         if os.path.exists(path0):
+#             path1 = path1[:-4] + ending
+        
+#             image1 = cv2.imread(path0)
+#             image2 = cv2.imread(path1)
+
+#             original = model(image1)
+#             augmented = model(image2)
+
+#             #bb_eval_label_orig.compare_to_label(original, label)
+#             bb_eval_label_aug.compare_to_label(augmented, label)
+#             bb_eval_orig_aug.compare_to_image(original, augmented)
+
+
+#     #bb_eval_label_orig.evaluate(args.augmentation, 'gt_original')
+#     bb_eval_label_aug.evaluate(args.augmentation, 'gt_augmented')
+#     bb_eval_orig_aug.evaluate(args.augmentation, 'orignal_augmented')
+
+
 if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     args = parse_args()
@@ -202,11 +245,12 @@ if __name__ == "__main__":
     bb_eval_label_aug = BBoxEvaluator(threshold=0.5)
     bb_eval_orig_aug = BBoxEvaluator(threshold=0.5)
 
-    for file in tqdm(reference_images):
-        path0 = os.path.join(args.dir0, 'images', file)
+    for file in tqdm(augmented_images):
+        reference_file = file.split('#')[0] + '.jpg'
+        path0 = os.path.join(args.dir0, 'images', reference_file)
         path1 = os.path.join(args.dir1, file)
-        file_path = os.path.join(args.dir0, 'images', file)
-        label_path = os.path.join(args.dir0, 'labels', file)[:-4] + '.txt'
+        file_path = os.path.join(args.dir0, 'images', reference_file)
+        label_path = os.path.join(args.dir0, 'labels', reference_file)[:-4] + '.txt'
         label = load_annotation(file_path, label_path)
         
         if os.path.exists(path0):
@@ -219,10 +263,10 @@ if __name__ == "__main__":
             augmented = model(image2)
 
             #bb_eval_label_orig.compare_to_label(original, label)
-            bb_eval_label_aug.compare_to_label(augmented, label)
+            #bb_eval_label_aug.compare_to_label(augmented, label)
             bb_eval_orig_aug.compare_to_image(original, augmented)
 
 
     #bb_eval_label_orig.evaluate(args.augmentation, 'gt_original')
-    bb_eval_label_aug.evaluate(args.augmentation, 'gt_augmented')
+    #bb_eval_label_aug.evaluate(args.augmentation, 'gt_augmented')
     bb_eval_orig_aug.evaluate(args.augmentation, 'orignal_augmented')
