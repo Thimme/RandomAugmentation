@@ -74,7 +74,7 @@ class BBoxEvaluator():
         results.insert(1, custom)
         results = ','.join(results) # type: ignore
         
-        with open("pami/pami.txt", "a") as f:
+        with open("pami.txt", "a") as f:
             f.writelines(results+'\n')
         
         f.close()
@@ -239,25 +239,20 @@ if __name__ == "__main__":
     reference_images = os.listdir(os.path.join(args.dir0, 'images'))
     reference_labels = os.listdir(os.path.join(args.dir0, 'labels'))
     augmented_images = os.listdir(args.dir1)
-    ending = os.path.splitext(os.listdir(args.dir1)[0])[-1].lower()  
 
     bb_eval_label_orig = BBoxEvaluator(threshold=0.5)
     bb_eval_label_aug = BBoxEvaluator(threshold=0.5)
     bb_eval_orig_aug = BBoxEvaluator(threshold=0.5)
 
     for file in tqdm(augmented_images):
-        reference_file = file.split('#')[0] + '.jpg'
-        path0 = os.path.join(args.dir0, 'images', reference_file)
-        path1 = os.path.join(args.dir1, file)
-        file_path = os.path.join(args.dir0, 'images', reference_file)
-        label_path = os.path.join(args.dir0, 'labels', reference_file)[:-4] + '.txt'
+        augmented_path = os.path.join(args.dir1, file)
+        file_path = os.path.join(args.dir0, 'images', file)[:-4] + '.jpg'
+        label_path = os.path.join(args.dir0, 'labels', file)[:-4] + '.txt'
         label = load_annotation(file_path, label_path)
         
-        if os.path.exists(path0):
-            path1 = path1[:-4] + ending
-        
-            image1 = cv2.imread(path0)
-            image2 = cv2.imread(path1)
+        if os.path.exists(file_path):        
+            image1 = cv2.imread(file_path)
+            image2 = cv2.imread(augmented_path)
 
             original = model(image1)
             augmented = model(image2)

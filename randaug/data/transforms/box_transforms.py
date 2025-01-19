@@ -15,6 +15,8 @@ from skimage.metrics import structural_similarity as ssim
 from randaug.data.classifier.classifier import SimpleClassifier, CLIPClassifier, DINOClassifier
 from detectron2.data import detection_utils as utils
 
+dino_device = f'cuda:{comm.get_rank()}'
+dino_model = DINOClassifier(device = dino_device)
 
 # Bounding box transforms
 
@@ -189,8 +191,6 @@ class DINOBBTransform(Transform):
     def __init__(self, image: np.ndarray, file_name: str, transforms: list):
         super().__init__()
         self.image = image # transformed image
-        self.device = f'cuda:{comm.get_rank()}'
-        self.model = DINOClassifier(device = self.device)
         self.threshold = 0.025
 
     def apply_image(self, img: np.ndarray):
@@ -213,7 +213,7 @@ class DINOBBTransform(Transform):
     
     def _predict(self, image, box):    
         cropped = crop_and_pad(image, box)
-        return self.model(cropped)
+        return dino_model(cropped)
 
     def _invalidate_bbox(self):
         return np.array([np.Infinity,

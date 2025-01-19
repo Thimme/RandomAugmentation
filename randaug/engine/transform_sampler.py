@@ -182,7 +182,11 @@ class TransformSampler():
         ops = self._sample_diffusion_models(ids=[0])
         augs = [self._map_to_transforms(op) for op in ops] 
         augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
-        print(augs)
+        return augs
+    
+    def experiment(self, experiment: str):
+        augs = [ComfyUIAugmentation(experiment=experiment, cfg=self.cfg)]
+        augs = [RandomAugmentation(self.cfg, [0], [aug]) for aug in augs]
         return augs
     
     def sample_output(self, magnitude=0):

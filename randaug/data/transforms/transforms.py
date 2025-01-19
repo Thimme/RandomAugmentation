@@ -307,6 +307,21 @@ class MGIEDiffusionSnowAugmentation(T.Augmentation):
     def get_transform(self, image, file_name):
         return MGIETransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
     
+
+class ComfyUIAugmentation(T.Augmentation):
+    
+    def __init__(self, experiment: str, cfg=None):
+        super().__init__()
+        self.name = experiment
+        self.weather = experiment.split('_')[-1]
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        #return MGIETransform(network=self.name, weather=self.weather, severity=0, file_path=file_name, cfg=self.cfg)
+        return ComfyUITransform(network=self.name, weather=self.weather, severity=0, file_path=file_name, cfg=self.cfg)
+    
+
+
 # Augmentations from paper: 
 # AutoAugment: Learning Augmentation Strategies from Data
 
@@ -621,7 +636,7 @@ class RandomAugmentation():
         if self.cfg.box_postprocessing == True:
             return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
         else:
-            return self.augmentations #+ self._append_standard_flip()
+            return self.augmentations + self._append_standard_flip()
     
     def _append_standard_flip(self):
         aug = T.RandomFlip(prob=0.5)
@@ -683,8 +698,7 @@ class GANTransform(Transform):
     def apply_segmentation(self, segmentation):
         return segmentation
     
-
-class MGIETransform(Transform):
+class ComfyUITransform(Transform):
 
     def __init__(self, network, weather, severity, file_path, cfg):
         super().__init__()
@@ -695,16 +709,76 @@ class MGIETransform(Transform):
         self.cfg = cfg
         self.image = self._read_image(self.file_path)
         self.original: np.ndarray
+
+    def _read_image(self, file_path: str):
+        filename = file_path.split('/')[-1]
+        prefix = self.random_weather_prefix()
+        filename_jpg = f'{prefix}{filename[:-4]}.jpg'
+        path = os.path.join('/mnt/ssd2/dataset/pami_train', str(self.name), filename_jpg)
+
+        if not os.path.isfile(path):
+            path = f'{path[:-4]}.png'
+        return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
+    
+    def apply_image(self, img: np.ndarray):
+        self.original = img
+        return self.image
+        
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def random_weather_prefix(self):
+        #return ''
+        # List of possible weather prefixes
+        prefixes = ['fog_', 'rain_', 'snow_']
+        
+        # Randomly select and return one of the prefixes
+        return random.choice(prefixes)
+
+    
+
+class MGIETransform(Transform):
+
+    def __init__(self, network, weather, severity, file_path, cfg):
+        super().__init__()
+        self.name = network
+        self.weather = weather
+        self.severity = severity
+        self.file_path = file_path
+        self.cfg = cfg
+        self.image = self._read_image2(self.file_path)
+        self.original: np.ndarray
     
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
         path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
         # path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+    
+        if not os.path.isfile(path):
+            path = f'{path[:-4]}.png'
+        return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
+    
+    def _read_image2(self, file_path: str):
+        filename = file_path.split('/')[-1]
+        prefix = self.random_weather_prefix()
+        filename_jpg = f'{prefix}{filename[:-4]}.jpg'
+        path = os.path.join('/mnt/ssd2/dataset/pami_train', str(self.name), filename_jpg)
 
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
+    
+    def random_weather_prefix(self):
+        #return ''
+        # List of possible weather prefixes
+        prefixes = ['fog_', 'rain_', 'snow_']
+        
+        # Randomly select and return one of the prefixes
+        return random.choice(prefixes)
     
     def apply_image(self, img: np.ndarray):
         self.original = img

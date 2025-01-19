@@ -15,6 +15,7 @@ def setup_frcnn(args):
     cfg.merge_from_file("configs/fasterrcnn.yaml")
     cfg.eval_output = "./evaluation"
     cfg.network = 'fasterrcnn'
+    cfg.save_image = False
     return cfg
 
 def setup_detr(args):
@@ -24,6 +25,7 @@ def setup_detr(args):
     cfg.merge_from_file("configs/detr.yaml")
     cfg.eval_output = "./evaluation"
     cfg.network = 'detr'
+    cfg.save_image = False
     return cfg
 
 def setup_retinanet(args):
@@ -32,6 +34,7 @@ def setup_retinanet(args):
     cfg.merge_from_file("configs/retinanet.yaml")
     cfg.eval_output = "./evaluation"
     cfg.network = 'retinanet'
+    cfg.save_image = False
     return cfg
 
 def main(args):
@@ -39,9 +42,9 @@ def main(args):
     #finetune(args)
     #no_augmentation(args)
     #randaug_weather(args)
-    randaug_bb_estimation(args)
+    #randaug_bb_estimation(args)
     #data_split(args)
-    #diffusion_search(args)
+    diffusion_search(args)
 
 
 def add_arguments():
