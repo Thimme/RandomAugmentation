@@ -176,7 +176,8 @@ class TransformSampler():
     
     def test(self):
         #return [RandomAugmentation(self.cfg, 1, [])]
-        return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), ShearXAugmentation(magnitude=1, cfg=self.cfg), SnowAugmentation(magnitude=2, cfg=self.cfg)])]
+        #return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), ShearXAugmentation(magnitude=1, cfg=self.cfg), SnowAugmentation(magnitude=2, cfg=self.cfg)])]
+        return [RandomAugmentation(self.cfg, 1, [ComfyUIAugmentation(experiment="experiment_024_snow", cfg=self.cfg), SnowAugmentation(magnitude=2, cfg=self.cfg)])]
     
     def diffusion_search(self):
         ops = self._sample_diffusion_models(ids=[0])

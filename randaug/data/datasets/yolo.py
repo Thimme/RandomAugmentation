@@ -11,26 +11,35 @@ class DetectionData:
     def __init__(self, file_name: str):
         self.filename = file_name
         self.image_id = file_name.split('/')[-1][:-4]
-        self.annotations = list()
+        self.annotations = []
         self.calculate_size()
-
 
     def calculate_size(self):
         im = cv2.imread(self.filename)
         self.width = im.shape[1]
         self.height = im.shape[0]
-    
-    
+
     def add_annotation(self, annotation):
         self.annotations.append(annotation)
 
+    def flip_horizontal(self):
+        """
+        Flip all bounding boxes horizontally in-place.
+        """
+        for ann in self.annotations:
+            x_min, y_min, x_max, y_max = ann.bbox
+            flipped_x_min = self.width - x_max
+            flipped_x_max = self.width - x_min
+
+            # Update the annotation's bbox
+            ann.bbox = [flipped_x_min, y_min, flipped_x_max, y_max]
 
     def to_dict(self):
         return {
-            "file_name": self.filename, 
+            "file_name": self.filename,
             "height": self.height,
             "width": self.width,
-            "image_id": self.image_id, 
+            "image_id": self.image_id,
             "annotations": [ann.to_dict() for ann in self.annotations]
         }
 

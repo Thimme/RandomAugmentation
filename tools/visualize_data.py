@@ -140,7 +140,6 @@ if __name__ == "__main__":
                 file_id = per_image['image_id']
                 img = Image.fromarray(img)
                 img.save(os.path.join(dirname, file_id + '.jpg'))
-                continue
                 vis = visualize_image(img, per_image["instances"])
 
                 if args.concat:

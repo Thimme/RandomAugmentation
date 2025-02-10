@@ -10,13 +10,27 @@ import uuid
 from detectron2.utils import comm
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from math import log10, sqrt 
-from fvcore.transforms.transform import Transform, TransformList, NoOpTransform
+from fvcore.transforms.transform import Transform, TransformList, NoOpTransform, HFlipTransform
 from skimage.metrics import structural_similarity as ssim
 from randaug.data.classifier.classifier import SimpleClassifier, CLIPClassifier, DINOClassifier
 from detectron2.data import detection_utils as utils
+from detectron2.config import get_cfg
+from detectron2.utils.logger import setup_logger
+from detectron2 import model_zoo
+from detectron2.engine import DefaultPredictor
+from randaug.data.datasets.yolo import load_annotation
+
 
 dino_device = f'cuda:{comm.get_rank()}'
 dino_model = DINOClassifier(device = dino_device)
+
+cfg = get_cfg()
+# add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
+cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+# Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
+frcnn = DefaultPredictor(cfg)
 
 # Bounding box transforms
 
@@ -222,6 +236,73 @@ class DINOBBTransform(Transform):
                          np.Infinity])
 
 
+# trained with classificator on images in bounding boxes
+class CutoutBBTransform(Transform):
+
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+        super().__init__()
+        self.image = image # transformed image
+        self.file_name = file_name
+        self.iou = 0.5
+        self.path_gt_labels = "/mnt/ssd2/dataset/reference/noboxes/" # should be in config
+        self.is_flipped = self.flip(transforms)
+
+    def apply_image(self, img: np.ndarray):
+        boxes = self.compare(self.image, self.file_name)
+        img = self.draw_cutout(img, boxes) # type: ignore
+        return img
+    
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        return box
+            
+    def apply_coords(self, coords):
+        return coords
+    
+    def apply_segmentation(self, segmentation):
+        return segmentation
+    
+    def flip(self, transforms) -> bool:
+        if any(isinstance(t, HFlipTransform) for t in transforms):
+            return True
+        return False
+    
+    def draw_cutout(self, img: np.ndarray, boxes):
+        """
+        Draw black filled rectangles on self.image for each bounding box in boxes.
+
+        :param boxes: list of bounding boxes. Each bounding box is [x1, y1, x2, y2].
+        """
+        im = img.copy()
+        # Make sure self.image is a valid numpy array in BGR or RGB format
+        for box in boxes:
+            # Convert coordinates to int if needed
+            x1, y1, x2, y2 = map(int, box)
+            cv2.rectangle(im, (x1, y1), (x2, y2), (0, 0, 0), thickness=-1)
+
+        return im
+    
+    def calculate_add_boxes(self, boxes1, boxes2):
+        boxes = []
+        for box1 in boxes1:
+            ious = [bb_intersection_over_union(box1, box2) > self.iou for box2 in boxes2]
+            if True not in ious:
+                boxes.append(box1)
+
+        return boxes
+    
+    def compare(self, image, file_name):
+        file_name = file_name.split('/')[-1]
+        file_path = os.path.join(self.path_gt_labels, 'images', file_name)[:-4] + '.jpg'
+        label_path = os.path.join(self.path_gt_labels, 'labels', file_name)[:-4] + '.txt'
+        annotation = load_annotation(file_path, label_path)
+        if self.is_flipped:
+            annotation.flip_horizontal()
+        prediction = frcnn(image)
+        boxes_augmented = get_bboxes(prediction)
+        boxes_gt = get_gt_boxes(annotation)
+        boxes = self.calculate_add_boxes(boxes_augmented, boxes_gt)
+        return boxes
+
 
 # trained with classificator on images in bounding boxes
 class SimpleBBTransform(Transform):
@@ -348,6 +429,8 @@ class SaveTransform(Transform):
         #print("Saving to {} ...".format(filepath))
         image.save(filepath)
 
+
+# utils
 def crop_and_pad(image: np.ndarray, box, resize=True):
 
     def expand2square(pil_img, background_color):
@@ -376,3 +459,36 @@ def crop(image: np.ndarray, box):
     im = im.crop(box[0])
     #im = im.resize((224, 224))
     return im
+
+
+def get_bboxes(data):
+    data = data['instances'].to('cpu')
+    pred_classes =  data.pred_classes.tolist()
+    pred_boxes = [box.tolist() for box in data.pred_boxes]
+    vehicle_boxes = []
+    for i, detection in enumerate(pred_classes):
+        if detection == 2:
+            vehicle_boxes.append(pred_boxes[i])
+    return vehicle_boxes
+
+def get_gt_boxes(data):
+    return [annotation.bbox for annotation in data.annotations]
+
+def bb_intersection_over_union(boxA, boxB):
+	# determine the (x, y)-coordinates of the intersection rectangle
+	xA = max(boxA[0], boxB[0])
+	yA = max(boxA[1], boxB[1])
+	xB = min(boxA[2], boxB[2])
+	yB = min(boxA[3], boxB[3])
+	# compute the area of intersection rectangle
+	interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+	# compute the area of both the prediction and ground-truth
+	# rectangles
+	boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+	boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+	# compute the intersection over union by taking the intersection
+	# area and dividing it by the sum of prediction + ground-truth
+	# areas - the interesection area
+	iou = interArea / float(boxAArea + boxBArea - interArea)
+	# return the intersection over union value
+	return iou

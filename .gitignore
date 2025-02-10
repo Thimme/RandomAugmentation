@@ -168,3 +168,4 @@ scripts/
 tools/deformation/
 tools/deformation_results/
 tools/deformation_improved/
+tools/visualize_deformation/

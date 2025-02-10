@@ -11,7 +11,7 @@ from fvcore.transforms.transform import Transform
 from randaug.data.transforms.corruptions import corrupt
 from randaug.data.albumentations import AlbumentationsTransform, prepare_param
 from enum import Enum
-from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform, SaveTransform
+from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform, SaveTransform, CutoutBBTransform
 from torchvision import transforms as v1
 
 MAGNITUDE_BINS = 5 
@@ -569,6 +569,8 @@ class BoundingboxAugmentation(T.Augmentation):
             return CLIPBBTransform(image=image, file_name=file_name, transforms=transforms)
         elif self.algorithm == 'dino':
             return DINOBBTransform(image=image, file_name=file_name, transforms=transforms)
+        elif self.algorithm == 'cutout':
+            return CutoutBBTransform(image=image, file_name=file_name, transforms=transforms)
         else:
             return NotImplementedError
 
@@ -643,8 +645,9 @@ class RandomAugmentation():
         return [aug]
 
     def _append_standard_transform(self):
+        cutout = BoundingboxAugmentation(algorithm='cutout')
         aug = BoundingboxAugmentation(algorithm='dino')
-        return [aug]
+        return [cutout, aug]
     
 
 class WeatherTransform(Transform):
@@ -731,7 +734,7 @@ class ComfyUITransform(Transform):
         return segmentation
     
     def random_weather_prefix(self):
-        #return ''
+        return ''
         # List of possible weather prefixes
         prefixes = ['fog_', 'rain_', 'snow_']
         
