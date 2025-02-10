@@ -14,7 +14,10 @@ from randaug.data.classifier.classifier import SimpleClassifier
 from randaug.data.classifier.clip import CLIPClassifier
 from randaug.data.classifier.dino import DINOClassifier
 from detectron2.data import detection_utils as utils
+import portalocker
 
+import yaml
+import json
 
 # Bounding box transforms
 
@@ -144,20 +147,73 @@ class AdjustBBTransform(Transform):
 # trained with classificator on images in bounding boxes
 class CLIPBBTransform(Transform):
 
-    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list, thresholds = None):
         super().__init__()
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
         self.model = CLIPClassifier(device=self.device)#.to(self.device)
-        self.threshold = 0.5
+        self.thresholds = thresholds
 
     def apply_image(self, img: np.ndarray):
         return img
     
-    def apply_box(self, box: np.ndarray) -> np.ndarray:
+    def calculate_box_size(self, box):
+        x1, y1, x2, y2, = box[0]
+        # Calculate length and width of the rectangle
+        length = abs(x2 - x1)
+        width = abs(y2 - y1)
+        # Calculate area of the rectangle
+        area = length * width
+        if area < 1024: #32²
+            return 'small_bb'
+        elif area < 9216: #96²
+            return 'medium_bb' 
+        else:
+            return 'large_bb'
+
+    def update_num_bb_json(self, box_size, type):
+        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2}
+        json_path = './output/boxes/num_bb.json'
+
         try:
-            if self._predict(self.image, box) < self.threshold:
-                #print('removeu')
+            # Attempt to read the JSON file with an exclusive lock
+            with open(json_path, 'r+') as file:
+                portalocker.lock(file, portalocker.LOCK_EX)  # Lock the file for exclusive access
+                json_data = json.load(file)
+
+                # Data processing
+                model = list(json_data.keys())[-1]  # Last model is currently used
+                box_size_index = dict_box_size[box_size]
+                json_data[model][box_size_index][box_size][type] += 1
+                updated_json_string = json.dumps(json_data, indent=4)
+
+                # Move back to the beginning and truncate the file to overwrite
+                file.seek(0)
+                file.truncate()
+                file.write(updated_json_string)
+
+                # The file is automatically unlocked when exiting the 'with' block
+
+        except json.JSONDecodeError as e:
+            print(f"Error reading JSON data: {e}")
+        except IOError as e:
+            print(f"File I/O error: {e}")
+
+
+    def apply_box(self, box: np.ndarray) -> np.ndarray:
+        box_size = self.calculate_box_size(box)
+        if comm.is_main_process():
+            self.update_num_bb_json(box_size, 'total')
+
+        threshold = self.thresholds[box_size]
+
+        if threshold == -1:
+            return box
+        
+        try:
+            if self._predict(self.image, box) < threshold:
+                if comm.is_main_process():
+                    self.update_num_bb_json(box_size, 'removed')
                 return self._invalidate_bbox()     
             else:
                 #print('manteve')
@@ -182,29 +238,86 @@ class CLIPBBTransform(Transform):
                          np.Infinity,
                          np.Infinity])
 
-
 # trained with classificator on images in bounding boxes
 class DINOBBTransform(Transform):
 
-    def __init__(self, image: np.ndarray, file_name: str, transforms: list):
+    def __init__(self, image: np.ndarray, file_name: str, transforms: list, augmentation = None, thresholds = None):
         super().__init__()
         self.image = image # transformed image
         self.device = f'cuda:{comm.get_rank()}'
         self.model = DINOClassifier(device = self.device)#.to(self.device)
+        self.augmentation = augmentation.replace("_", "")
+        self.thresholds = thresholds 
 
     def apply_image(self, img: np.ndarray):
         return img
     
+    def calculate_box_size(self, box):
+        x1, y1, x2, y2, = box[0]
+        # Calculate length and width of the rectangle
+        length = abs(x2 - x1)
+        width = abs(y2 - y1)
+        # Calculate area of the rectangle
+        area = length * width
+        if area < 1024: #32²
+            return 'small_bb'
+        elif area < 9216: #96²
+            return 'medium_bb' 
+        else:
+            return 'large_bb'
+
+    def update_num_bb_json(self, box_size, type):
+        dict_box_size = {'large_bb': 0, 'medium_bb': 1, 'small_bb': 2} 
+        json_path = './output/num_bb.json'
+
+        if not (os.path.isfile(json_path)):
+            return 
+
+         try:
+            # Attempt to read the JSON file with an exclusive lock
+            with open(json_path, 'r+') as file:
+                portalocker.lock(file, portalocker.LOCK_EX)  # Lock the file for exclusive access
+                json_data = json.load(file) 
+
+                model = list(json_data.keys())[-1] #last model is the one used now
+                box_size_index = dict_box_size[box_size]
+
+                json_data[model][box_size_index][box_size][type] += 1
+
+                updated_json_string = json.dumps(json_data, indent=4)
+
+                # Move back to the beginning and truncate the file to overwrite
+                file.seek(0)
+                file.truncate()
+                file.write(updated_json_string)
+
+            # The file is automatically unlocked when exiting the 'with' block
+
+        except json.JSONDecodeError as e:
+            print(f"Error reading JSON data: {e}")
+        except IOError as e:
+            print(f"File I/O error: {e}")
+
+    
     def apply_box(self, box: np.ndarray) -> np.ndarray:
+
+        box_size = self.calculate_box_size(box)
+        self.update_num_bb_json(box_size, 'total')
+        threshold = self.thresholds[box_size]
+
+        if threshold == -1:
+            return box
+        
         try:
-            pred = self._predict(self.image, box)
-            if pred == 'non-vehicles':
-                #print('removeu')
+            if self._predict(self.image, box) < threshold:
+                self.update_num_bb_json(box_size, 'removed')
                 return self._invalidate_bbox()     
             else:
-                #print('manteve')
                 return box
-        except (AttributeError, NotImplementedError):
+            
+            
+        except (AttributeError, NotImplementedError) as error:
+            print(error)
             return box
             
     def apply_coords(self, coords):

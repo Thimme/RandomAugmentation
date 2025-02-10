@@ -8,28 +8,28 @@ from randaug.data.transforms.transforms import *
 from itertools import product
 
 gan_transforms = [
-    #"CycleGANFogAugmentation",
+    "CycleGANFogAugmentation",
     #"CycleGANRainAugmentation",
-    #"CycleGANSnowAugmentation",
+    "CycleGANSnowAugmentation",
     #"CUTFogAugmentation",
     #"CUTRainAugmentation",
     #"CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
-    #"CycleDiffusionFogAugmentation",
-    #"CycleDiffusionRainAugmentation",
-    #"CycleDiffusionSnowAugmentation",
-    "StableDiffusionFogAugmentation",
-    "StableDiffusionRainAugmentation",
-    "StableDiffusionSnowAugmentation",
-    #"PlugPlayFogAugmentation",
+    # "CycleDiffusionFogAugmentation",
+    "CycleDiffusionRainAugmentation",
+    "CycleDiffusionSnowAugmentation",
+    # "StableDiffusionFogAugmentation",
+    # "StableDiffusionRainAugmentation",
+    # "StableDiffusionSnowAugmentation",
+    # "PlugPlayFogAugmentation",
     #"PlugPlayRainAugmentation",
-    #"PlugPlaySnowAugmentation",
-    #"ControlNetFogAugmentation",
-    #"ControlNetRainAugmentation",
+    # "PlugPlaySnowAugmentation",
+    # "ControlNetFogAugmentation",
+    # "ControlNetRainAugmentation",
     #"ControlNetSnowAugmentation",
-    #"MGIEDiffusionFogAugmentation",
+    # "MGIEDiffusionFogAugmentation",
     #"MGIEDiffusionRainAugmentation",
     #"MGIEDiffusionSnowAugmentation",
 ]
@@ -100,7 +100,8 @@ class TransformSampler():
     
     def _sample_diffusion_models(self, ids=[]):
         augs = []
-        for transform in diffusion_transforms:
+        transforms = diffusion_transforms + gan_transforms
+        for transform in transforms:
             _ = [augs.append([(transform, id)]) for id in ids]
 
         return augs
@@ -168,7 +169,7 @@ class TransformSampler():
     def diffusion_search(self):
         ops = self._sample_diffusion_models(ids=[1])
         augs = [self._map_to_transforms(op) for op in ops] 
-        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[1], aug[0], self.cfg.estimator) for aug in augs]
         print(augs)
         return augs
     
@@ -256,3 +257,57 @@ class RandomSampler():
         ops = self._add_magnitude(ops, M)
         transforms, _ = self._map_to_transforms(ops)
         return transforms
+
+class RandomSamplerGANDiffusion():
+
+    def __init__(self, cfg, device):
+        self.cfg = cfg
+        self.device = device
+
+    def _sample_ops(self, N):
+        transforms = diffusion_transforms + gan_transforms
+        sampled = np.random.choice(transforms, N) # type: ignore
+        return sampled
+    
+    def _add_magnitude(self, ops, M):
+        magnitude = M
+        return [(o, magnitude) for o in ops]
+    
+    def _map_to_transforms(self, ops):
+        transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
+        transforms = [self._init_transform(t, op[1]) for t, op in zip(transforms, ops)]
+        magnitudes = [op[1] for op in ops]
+        return transforms, magnitudes
+    
+    # Random sampling causes the drop augmentation not to distribute across devices so this function is needed
+    def _init_transform(self, transform, magnitude) -> T.Augmentation:
+        if transform == DropAugmentation:
+            return transform(magnitude, cfg=self.cfg, device=self.device)
+        else:
+            return transform(magnitude, cfg=self.cfg)
+    
+
+    def random_augmentation(self, N, M):
+        ops = self._sample_ops(N)
+        ops = self._add_magnitude(ops, M)
+        self.augmentations, _ = self._map_to_transforms(ops)
+        self.augmentations = self.get_transforms()
+        #transforms = RandomAugmentation(self.cfg, _, transforms)
+        return self.augmentations
+    
+    def get_transforms(self):
+        if self.cfg.box_postprocessing == True:
+            return self.augmentations + self._append_standard_transform() + self._append_standard_flip()
+        else:
+            return self.augmentations + self._append_standard_flip()
+            #return self.augmentations
+    
+    def _append_standard_flip(self):
+        aug = T.RandomFlip(prob=0.5)
+        return [aug]
+
+    def _append_standard_transform(self):
+        name = str(self.augmentations[0].name)
+        weather = str(self.augmentations[0].weather)
+        aug = BoundingboxAugmentation(algorithm=self.cfg.estimator, augmentation=name + weather)
+        return [aug]
