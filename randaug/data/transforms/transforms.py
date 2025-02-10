@@ -661,7 +661,7 @@ class RandomAugmentation():
         return [aug]
 
     def _append_standard_transform(self):
-        aug = BoundingboxAugmentation(algorithm='dino')
+        aug = BoundingboxAugmentation(algorithm='clip')
         return [aug]
     
 
