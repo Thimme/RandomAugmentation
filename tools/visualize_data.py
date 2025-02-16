@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 import sys
-sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation/") # bad code
+sys.path.append("/home/rothmeier/Documents/github/RandomAugmentation/") # bad code
 
 import argparse
 import os
@@ -140,7 +140,8 @@ if __name__ == "__main__":
                 file_id = per_image['image_id']
                 img = Image.fromarray(img)
                 img.save(os.path.join(dirname, file_id + '.jpg'))
-                vis = visualize_image(img, per_image["instances"])
+                continue
+                #vis = visualize_image(img, per_image["instances"])
 
                 if args.concat:
                     # exchange with original bounding boxes

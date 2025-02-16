@@ -96,16 +96,19 @@ class RandTrainer(TrainerBase):
             self.start_iter = self.iter + 1
 
     def load_model(self, cfg):
-        if cfg.network == 'detr':
+        if 'detr' in cfg.network:
             model = self.build_model(cfg)
             optimizer = self._build_detr_optimizer(cfg, model)
             return model, optimizer
-        elif cfg.network == 'yolo':
-            return 0, 1
         else:
             model = self.build_model(cfg)
             optimizer = self.build_optimizer(cfg, model)
-            return model, optimizer
+        
+        if cfg.frozen_backbone:
+            for param in model.backbone.parameters():
+                param.requires_grad = False
+        
+        return model, optimizer
 
     def run_step(self):
         self._trainer.iter = self.iter
@@ -337,7 +340,8 @@ class RandTrainer(TrainerBase):
                 results_a["augmentation"] = augmentation
                 results_a["dataset"] = dataset_name
                 results_a["algorithm"] = cfg.network
-                results_a["experiment"] = cfg.experiment + '_bbox_cutout' if cfg.box_postprocessing else cfg.experiment
+                results_a["experiment"] = cfg.experiment + '_bbox' if cfg.box_postprocessing else cfg.experiment
+                results_a["experiment"] = results_a["experiment"] + '_cutout' if cfg.cutout_postprocessing else results_a["experiment"]
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:

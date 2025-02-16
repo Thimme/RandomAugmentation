@@ -15,6 +15,7 @@ from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTr
 from torchvision import transforms as v1
 
 MAGNITUDE_BINS = 5 
+DATA_PATH = "/home/rothmeier/Documents/datasets" 
 
 class Augmentations(Enum):
 
@@ -315,10 +316,12 @@ class ComfyUIAugmentation(T.Augmentation):
         self.name = experiment
         self.weather = experiment.split('_')[-1]
         self.cfg = cfg
+        self.progressive_count = 0
 
     def get_transform(self, image, file_name):
         #return MGIETransform(network=self.name, weather=self.weather, severity=0, file_path=file_name, cfg=self.cfg)
-        return ComfyUITransform(network=self.name, weather=self.weather, severity=0, file_path=file_name, cfg=self.cfg)
+        self.progressive_count += 1
+        return ComfyUITransform(network=self.name, weather=self.weather, severity=self.progressive_count, file_path=file_name, cfg=self.cfg)
     
 
 
@@ -635,19 +638,19 @@ class RandomAugmentation():
         return f'{self.cfg.rand_N}-{repr}'
     
     def get_transforms(self):
-        if self.cfg.box_postprocessing == True:
-            return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
-        else:
-            return self.augmentations + self._append_standard_flip()
+        return self.augmentations + self._append_standard_flip() + self._append_standard_transform()
     
     def _append_standard_flip(self):
         aug = T.RandomFlip(prob=0.5)
         return [aug]
 
     def _append_standard_transform(self):
-        cutout = BoundingboxAugmentation(algorithm='cutout')
-        aug = BoundingboxAugmentation(algorithm='dino')
-        return [cutout, aug]
+        augs = []
+        if self.cfg.cutout_postprocessing == True:
+            augs.append(BoundingboxAugmentation(algorithm='cutout'))
+        if self.cfg.box_postprocessing == True:
+            augs.append(BoundingboxAugmentation(algorithm='dino'))
+        return augs
     
 
 class WeatherTransform(Transform):
@@ -684,8 +687,8 @@ class GANTransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
-        # path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.weather), filename_jpg)
+        path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        # path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.weather), filename_jpg)
 
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
@@ -715,10 +718,15 @@ class ComfyUITransform(Transform):
 
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
-        prefix = self.random_weather_prefix()
+        prefix = '' if not self.cfg.weather == 'diverse' else self.random_weather_prefix()
         filename_jpg = f'{prefix}{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/pami_train', str(self.name), filename_jpg)
-
+        
+        if self.cfg.training == 'progressive':
+            self.name = self.progressive_experiment()
+        elif self.cfg.training == 'random':
+            self.name = self.random_experiment()
+        path = os.path.join(f'{DATA_PATH}/pami_train', str(self.name), filename_jpg)
+        
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
@@ -732,9 +740,34 @@ class ComfyUITransform(Transform):
     
     def apply_segmentation(self, segmentation):
         return segmentation
+
+    def progressive_experiment(self):
+        experiments = ['024', '030', '031', '032', '033', '034']
+        if self.cfg.weather == 'fog':
+            experiments = ['039', '040', '041', '042', '043', '044']
+
+        #experiments = ['024', '030', '031', '032', '033', '034']
+        experiments.reverse()
+        iterations = self.cfg.SOLVER.MAX_ITER
+        progressive_count = max(self.severity, 0) / 2.0  # Ensure progressive_count is non-negative
+        choice = min(math.floor((progressive_count / iterations) * len(experiments)), len(experiments) - 1)
+        if self.cfg.weather == 'diverse':
+            return f'experiment_{experiments[choice]}'
+        else:
+            return f'experiment_{experiments[choice]}_{self.cfg.weather}'
     
+    def random_experiment(self):
+        experiments = ['024', '030', '031', '032', '033', '034']
+        if self.cfg.weather == 'fog':
+            experiments = ['039', '040', '041', '042', '043', '044']
+        #experiments = ['024', '030', '031', '032', '033', '034']
+        choice = np.random.choice(experiments)
+        if self.cfg.weather == 'diverse':
+            return f'experiment_{choice}'
+        else:
+            return f'experiment_{choice}_{self.cfg.weather}'
+
     def random_weather_prefix(self):
-        return ''
         # List of possible weather prefixes
         prefixes = ['fog_', 'rain_', 'snow_']
         
@@ -758,8 +791,8 @@ class MGIETransform(Transform):
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
-        # path = os.path.join('/mnt/ssd2/dataset/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
+        path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        # path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
     
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
@@ -769,7 +802,7 @@ class MGIETransform(Transform):
         filename = file_path.split('/')[-1]
         prefix = self.random_weather_prefix()
         filename_jpg = f'{prefix}{filename[:-4]}.jpg'
-        path = os.path.join('/mnt/ssd2/dataset/pami_train', str(self.name), filename_jpg)
+        path = os.path.join(f'{DATA_PATH}/pami_train', str(self.name), filename_jpg)
 
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'

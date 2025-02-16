@@ -18,6 +18,24 @@ def setup_frcnn(args):
     cfg.save_image = False
     return cfg
 
+def setup_frcnn_r101(args):
+    cfg = get_cfg()
+    cfg.dataroot = args.dataroot
+    cfg.merge_from_file("configs/fasterrcnn_r101.yaml")
+    cfg.eval_output = "./evaluation"
+    cfg.network = 'fasterrcnn_r101'
+    cfg.save_image = False
+    return cfg
+
+def setup_frcnn_r101_dc5(args):
+    cfg = get_cfg()
+    cfg.dataroot = args.dataroot
+    cfg.merge_from_file("configs/fasterrcnn_r101_dc5.yaml")
+    cfg.eval_output = "./evaluation"
+    cfg.network = 'fasterrcnn_r101_dc5'
+    cfg.save_image = False
+    return cfg
+
 def setup_detr(args):
     cfg = get_cfg()
     add_detr_config(cfg)
@@ -25,6 +43,26 @@ def setup_detr(args):
     cfg.merge_from_file("configs/detr.yaml")
     cfg.eval_output = "./evaluation"
     cfg.network = 'detr'
+    cfg.save_image = False
+    return cfg
+
+def setup_detr_r101(args):
+    cfg = get_cfg()
+    add_detr_config(cfg)
+    cfg.dataroot = args.dataroot
+    cfg.merge_from_file("configs/detr_r101.yaml")
+    cfg.eval_output = "./evaluation"
+    cfg.network = 'detr_r101'
+    cfg.save_image = False
+    return cfg
+
+def setup_detr_r101_dc5(args):
+    cfg = get_cfg()
+    add_detr_config(cfg)
+    cfg.dataroot = args.dataroot
+    cfg.merge_from_file("configs/detr_r101_dc5.yaml")
+    cfg.eval_output = "./evaluation"
+    cfg.network = 'detr_r101_dc5'
     cfg.save_image = False
     return cfg
 
@@ -37,11 +75,23 @@ def setup_retinanet(args):
     cfg.save_image = False
     return cfg
 
+def setup_retinanet_r101(args):
+    cfg = get_cfg()
+    cfg.dataroot = args.dataroot
+    cfg.merge_from_file("configs/retinanet_r101.yaml")
+    cfg.eval_output = "./evaluation"
+    cfg.network = 'retinanet_r101'
+    cfg.save_image = False
+    return cfg
+
+
 setup_dict = {
     "experiment_035_snow": [setup_retinanet]
 }
 
 def main(args):
+    #progressive_augmentation(args)
+    #diverse_augmentation(args)
     evaluate_experiment(args)
 
 def add_arguments():
@@ -49,21 +99,30 @@ def add_arguments():
     parser.add_argument("--dataroot", type=str, help="Specify the folder to all datasets")
     parser.add_argument("--epochs", default=0, type=int, help="Type the line number in results.json to continue")
     parser.add_argument("--experiment", type=str, help="Specify the experiment to be executed")
+    parser.add_argument("--bbox", type=bool, default=False, help="Specify if bounding box estimation is to be used")
+    parser.add_argument("--cutout", type=bool, default=False, help="Specify if cutout is to be used")
+    parser.add_argument("--frozen_backbone", type=bool, default=False, help="Specify if backbone is frozen")
+    parser.add_argument("--training", type=str, default='normal', help="Specify if backbone is frozen")
+    parser.add_argument("--iterations", type=int, default=3, help="Specify the number of itations")
+    parser.add_argument("--weather", type=str, default="diverse", help="Specify an extra tag to separate datasets")
     return parser
 
 # EVAL 
 
 def evaluate_experiment(args):
     setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
-    iterations = 3
 
-    for _ in range(iterations):
+    for _ in range(args.iterations):
         for setup_func in setup_funcs:
             cfg = setup_func(args)
-            cfg.box_postprocessing = True
+            cfg.box_postprocessing = args.bbox
+            cfg.cutout_postprocessing = args.cutout
+            cfg.frozen_backbone = args.frozen_backbone
+            cfg.training = args.training
+            cfg.weather = args.weather
             default_setup(cfg, args)
 
-            # Set the configuration parameters
+            # Set the configuration parameters 
             cfg.experiment = args.experiment
             cfg.aug_prob = 1.0
             cfg.rand_N = 1
@@ -79,7 +138,9 @@ def evaluate_experiment(args):
 def evaluate_experiment_dict(args):
     for setup_func in setup_dict[args.experiment]:
         cfg = setup_func(args)
-        cfg.box_postprocessing = True
+        cfg.box_postprocessing = args.bbox
+        cfg.cutout_postprocessing = args.cutout
+        cfg.frozen_backbone = False
         default_setup(cfg, args)
 
         # Set the configuration parameters
@@ -96,6 +157,58 @@ def evaluate_experiment_dict(args):
             trainer.train()
 
 
+def progressive_augmentation(args):
+    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+    iterations = 3
+
+    for _ in range(iterations):
+        for setup_func in setup_funcs:
+            cfg = setup_func(args)
+            cfg.box_postprocessing = args.bbox
+            cfg.cutout_postprocessing = args.cutout
+            cfg.frozen_backbone = False
+            default_setup(cfg, args)
+
+            # Set the configuration parameters
+            cfg.experiment = args.experiment
+            cfg.aug_prob = 1.0
+            cfg.rand_N = 1
+            cfg.rand_M = 0
+
+            sampler = TransformSampler(cfg, epochs=args.epochs)
+
+            for augmentation in sampler.experiment(experiment=cfg.experiment):
+                trainer = RandTrainer(cfg, augmentation=augmentation) 
+                trainer.resume_or_load(resume=args.resume)
+                trainer.train()
+
+
+def diverse_augmentation(args):
+    setup_funcs = [setup_frcnn, setup_frcnn, setup_detr, setup_retinanet, setup_frcnn, setup_detr, setup_retinanet]
+    iterations = 1
+
+    for _ in range(iterations):
+        for setup_func in setup_funcs:
+            cfg = setup_func(args)
+            cfg.box_postprocessing = args.bbox
+            cfg.cutout_postprocessing = args.cutout
+            cfg.frozen_backbone = False
+            default_setup(cfg, args)
+
+            # Set the configuration parameters
+            cfg.experiment = args.experiment
+            cfg.aug_prob = 1.0
+            cfg.rand_N = 1
+            cfg.rand_M = 0
+
+            sampler = TransformSampler(cfg, epochs=args.epochs)
+
+            for augmentation in sampler.experiment(experiment=cfg.experiment):
+                trainer = RandTrainer(cfg, augmentation=augmentation) 
+                trainer.resume_or_load(resume=args.resume)
+                trainer.train()
+                
+
 def no_augmentation(args):
     setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
     iterations = 1
@@ -108,6 +221,7 @@ def no_augmentation(args):
             cfg.rand_M = 2 # magnitude of transforms
 
             cfg.box_postprocessing = False
+            cfg.frozen_backbone = False
             default_setup(cfg, args)
             
             sampler = TransformSampler(cfg, epochs=args.epochs)
