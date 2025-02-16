@@ -734,7 +734,7 @@ class ComfyUITransform(Transform):
         return segmentation
     
     def random_weather_prefix(self):
-        return ''
+        #return ''
         # List of possible weather prefixes
         prefixes = ['fog_', 'rain_', 'snow_']
         
