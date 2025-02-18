@@ -167,7 +167,7 @@ class RandTrainer(TrainerBase):
         ]
 
         def test_and_save_results():
-            self._last_eval_results = self.test(self.cfg, self.model, augmentation=str(self.rand_aug))
+            self._last_eval_results = self.test(self.cfg, self.model, augmentation=str(self.rand_aug), iteration=self._trainer.iter)
             return self._last_eval_results
 
         # Do evaluation after checkpointer, because then if it fails,
@@ -285,7 +285,7 @@ class RandTrainer(TrainerBase):
         return build_detection_test_loader(cfg, dataset_name)
 
     @classmethod
-    def test(cls, cfg, model, evaluators=None, augmentation=None):
+    def test(cls, cfg, model, evaluators=None, augmentation=None, iteration=0):
         """
         Evaluate the given model. The given model is expected to already contain
         weights to evaluate.
@@ -342,6 +342,7 @@ class RandTrainer(TrainerBase):
                 results_a["algorithm"] = cfg.network
                 results_a["experiment"] = cfg.experiment + '_bbox' if cfg.box_postprocessing else cfg.experiment
                 results_a["experiment"] = results_a["experiment"] + '_cutout' if cfg.cutout_postprocessing else results_a["experiment"]
+                results_a["iterations"] = iteration + 1
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:

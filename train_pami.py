@@ -105,6 +105,7 @@ def add_arguments():
     parser.add_argument("--training", type=str, default='normal', help="Specify if backbone is frozen")
     parser.add_argument("--iterations", type=int, default=3, help="Specify the number of itations")
     parser.add_argument("--weather", type=str, default="diverse", help="Specify an extra tag to separate datasets")
+    parser.add_argument("--no_augmentation", type=bool, default=False, help="Specify if no augmentations should be applied")
     return parser
 
 # EVAL 
@@ -120,6 +121,8 @@ def evaluate_experiment(args):
             cfg.frozen_backbone = args.frozen_backbone
             cfg.training = args.training
             cfg.weather = args.weather
+            cfg.SOLVER.MAX_ITER = 10000
+            cfg.TEST.EVAL_PERIOD = 1000
             default_setup(cfg, args)
 
             # Set the configuration parameters 
@@ -130,10 +133,17 @@ def evaluate_experiment(args):
 
             sampler = TransformSampler(cfg, epochs=args.epochs)
 
-            for augmentation in sampler.experiment(experiment=cfg.experiment):
-                trainer = RandTrainer(cfg, augmentation=augmentation) 
-                trainer.resume_or_load(resume=args.resume)
-                trainer.train()
+            if args.no_augmentation == False:
+                for augmentation in sampler.experiment(experiment=cfg.experiment):
+                    trainer = RandTrainer(cfg, augmentation=augmentation) 
+                    trainer.resume_or_load(resume=args.resume)
+                    trainer.train()
+            else:
+                for augmentation in sampler.no_augmentation():
+                    trainer = RandTrainer(cfg, augmentation=augmentation)
+                    trainer.resume_or_load(resume=args.resume)
+                    trainer.train()
+
 
 def evaluate_experiment_dict(args):
     for setup_func in setup_dict[args.experiment]:
@@ -230,11 +240,10 @@ def no_augmentation(args):
                 trainer = RandTrainer(cfg, augmentation=augmentation)
                 trainer.resume_or_load(resume=args.resume)
                 trainer.train()
-                sampler = TransformSampler(cfg, epochs=args.epochs)
             
 
 if __name__ == "__main__":
-    mp.set_start_method('spawn')
+    mp.set_start_method("fork", force=True)
     args = add_arguments().parse_args()
     print("Command Line Args:", args)
     launch(
