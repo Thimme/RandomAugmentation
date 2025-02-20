@@ -244,7 +244,7 @@ class CutoutBBTransform(Transform):
         self.image = image # transformed image
         self.file_name = file_name
         self.iou = 0.5
-        self.path_gt_labels = "/home/rothmeier/Documents/datasets/reference/noboxes/" # should be in config
+        self.path_gt_labels = "/mnt/ssd2/dataset/reference/noboxes/" # should be in config
         self.is_flipped = self.flip(transforms)
 
     def apply_image(self, img: np.ndarray):

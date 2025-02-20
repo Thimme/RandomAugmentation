@@ -742,9 +742,9 @@ class ComfyUITransform(Transform):
         return segmentation
 
     def progressive_experiment(self):
-        experiments = ['024', '030', '031', '032', '033', '034', '035', '036', '037', '038']
+        experiments = ['024', '030', '031', '032', '033', '034']
         if self.cfg.weather == 'fog':
-            experiments = ['039', '040', '041', '042', '043', '044', '045', '046', '047', '048']
+            experiments = ['039', '040', '041', '042', '043', '044']
 
         #experiments = ['024', '030', '031', '032', '033', '034']
         experiments.reverse()
@@ -757,9 +757,9 @@ class ComfyUITransform(Transform):
             return f'experiment_{experiments[choice]}_{self.cfg.weather}'
     
     def random_experiment(self):
-        experiments = ['024', '030', '031', '032', '033', '034', '035', '036', '037', '038']
+        experiments = ['024', '030', '031', '032', '033', '034']
         if self.cfg.weather == 'fog':
-            experiments = ['039', '040', '041', '042', '043', '044', '045', '046', '047', '048']
+            experiments = ['039', '040', '041', '042', '043', '044']
         #experiments = ['024', '030', '031', '032', '033', '034']
         choice = np.random.choice(experiments)
         if self.cfg.weather == 'diverse':

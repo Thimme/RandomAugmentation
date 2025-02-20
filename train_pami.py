@@ -111,7 +111,7 @@ def add_arguments():
 # EVAL 
 
 def evaluate_experiment(args):
-    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+    setup_funcs = [setup_retinanet, setup_detr]
 
     for _ in range(args.iterations):
         for setup_func in setup_funcs:
@@ -121,8 +121,9 @@ def evaluate_experiment(args):
             cfg.frozen_backbone = args.frozen_backbone
             cfg.training = args.training
             cfg.weather = args.weather
-            cfg.SOLVER.MAX_ITER = 10000
-            cfg.TEST.EVAL_PERIOD = 1000
+            cfg.SOLVER.MAX_ITER = 3000
+            cfg.TEST.EVAL_PERIOD = 0
+            cfg.DATALOADER.NUM_WORKERS = 0
             default_setup(cfg, args)
 
             # Set the configuration parameters 
