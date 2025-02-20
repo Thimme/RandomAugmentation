@@ -15,7 +15,7 @@ from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTr
 from torchvision import transforms as v1
 
 MAGNITUDE_BINS = 5 
-DATA_PATH = "/mnt/ssd2/dataset" 
+DATA_PATH = "/home/rothmeier/Documents/datasets" 
 
 class Augmentations(Enum):
 

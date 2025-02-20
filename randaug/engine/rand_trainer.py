@@ -340,7 +340,7 @@ class RandTrainer(TrainerBase):
                 results_a["augmentation"] = augmentation
                 results_a["dataset"] = dataset_name
                 results_a["algorithm"] = cfg.network
-                results_a["experiment"] = cfg.experiment + '_bbox' if cfg.box_postprocessing else cfg.experiment
+                results_a["experiment"] = cfg.experiment_name + '_bbox' if cfg.box_postprocessing else cfg.experiment_name
                 results_a["experiment"] = results_a["experiment"] + '_cutout' if cfg.cutout_postprocessing else results_a["experiment"]
                 results_a["iterations"] = iteration + 1
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)

@@ -99,6 +99,7 @@ def add_arguments():
     parser.add_argument("--dataroot", type=str, help="Specify the folder to all datasets")
     parser.add_argument("--epochs", default=0, type=int, help="Type the line number in results.json to continue")
     parser.add_argument("--experiment", type=str, help="Specify the experiment to be executed")
+    parser.add_argument("--experiment_name", type=str, help="Specify the name for the experiment to be saved")
     parser.add_argument("--bbox", type=bool, default=False, help="Specify if bounding box estimation is to be used")
     parser.add_argument("--cutout", type=bool, default=False, help="Specify if cutout is to be used")
     parser.add_argument("--frozen_backbone", type=bool, default=False, help="Specify if backbone is frozen")
@@ -108,10 +109,23 @@ def add_arguments():
     parser.add_argument("--no_augmentation", type=bool, default=False, help="Specify if no augmentations should be applied")
     return parser
 
-# EVAL 
+def custom_setup_backbone_augmentation(cfg):
+    if 'detr' in cfg.network:
+        cfg.training = 'progressive'
+    elif 'fasterrcnn' in cfg.network: 
+        cfg.training = 'random'
+    elif 'retinanet' in cfg.network:
+        cfg.training = 'random'
+        cfg.cutout_postprocessing = True
+    return cfg
+
+def custom_setup(cfg):
+    if 'detr' in cfg.network:
+        cfg.cutout_postprocessing = False
+    return cfg
 
 def evaluate_experiment(args):
-    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+    setup_funcs = [setup_frcnn_r101, setup_detr_r101, setup_retinanet_r101, setup_detr_r101_dc5, setup_frcnn_r101_dc5, setup_frcnn, setup_detr, setup_retinanet]
 
     for _ in range(args.iterations):
         for setup_func in setup_funcs:
@@ -121,8 +135,11 @@ def evaluate_experiment(args):
             cfg.frozen_backbone = args.frozen_backbone
             cfg.training = args.training
             cfg.weather = args.weather
+            cfg.experiment_name = args.experiment_name
             cfg.SOLVER.MAX_ITER = 10000
             cfg.TEST.EVAL_PERIOD = 1000
+            cfg.DATALOADER.NUM_WORKERS = 0
+            cfg = custom_setup(cfg)
             default_setup(cfg, args)
 
             # Set the configuration parameters 
