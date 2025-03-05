@@ -93,6 +93,7 @@ def main(args):
     #progressive_augmentation(args)
     #diverse_augmentation(args)
     evaluate_experiment(args)
+    #fog_experiment(args)
 
 def add_arguments():
     parser = default_argument_parser()
@@ -119,13 +120,13 @@ def custom_setup_backbone_augmentation(cfg):
         cfg.cutout_postprocessing = True
     return cfg
 
-def custom_setup(cfg):
+def custom_setup_cyclegan_cut(cfg):
     if 'detr' in cfg.network:
         cfg.cutout_postprocessing = False
     return cfg
 
 def evaluate_experiment(args):
-    setup_funcs = [setup_frcnn_r101, setup_detr_r101, setup_retinanet_r101, setup_detr_r101_dc5, setup_frcnn_r101_dc5, setup_frcnn, setup_detr, setup_retinanet]
+    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet, setup_frcnn_r101, setup_detr_r101, setup_retinanet_r101, setup_detr_r101_dc5, setup_frcnn_r101_dc5]
 
     for _ in range(args.iterations):
         for setup_func in setup_funcs:
@@ -139,7 +140,12 @@ def evaluate_experiment(args):
             cfg.SOLVER.MAX_ITER = 10000
             cfg.TEST.EVAL_PERIOD = 1000
             cfg.DATALOADER.NUM_WORKERS = 0
-            cfg = custom_setup(cfg)
+
+            if args.experiment_name == 'experiment_backbone_augmentation':
+                cfg = custom_setup_backbone_augmentation(cfg)
+            elif args.experiment_name == 'experiment_backbone_cyclegan':
+                cfg = custom_setup_cyclegan_cut(cfg)
+
             default_setup(cfg, args)
 
             # Set the configuration parameters 
@@ -257,6 +263,39 @@ def no_augmentation(args):
                 trainer = RandTrainer(cfg, augmentation=augmentation)
                 trainer.resume_or_load(resume=args.resume)
                 trainer.train()
+
+def fog_experiment(args):
+    setup_funcs = [setup_detr]
+    iterations = 1
+
+    for _ in range(iterations):
+        for setup_func in setup_funcs:
+            cfg = setup_func(args)
+            cfg.box_postprocessing = False
+            cfg.cutout_postprocessing = False
+            cfg.frozen_backbone = False
+            cfg.experiment_name = 'midjourney_fog_synth'
+            cfg.SOLVER.MAX_ITER = 2500
+            cfg.TEST.EVAL_PERIOD = 0
+            cfg.DATALOADER.NUM_WORKERS = 0
+            #cfg = custom_setup(cfg)
+            default_setup(cfg, args)
+
+            # Set the configuration parameters 
+            cfg.experiment = args.experiment
+            cfg.aug_prob = 0.5
+            cfg.rand_N = 1
+            cfg.rand_M = 0
+
+            
+            sampler = TransformSampler(cfg, epochs=args.epochs)
+
+            for augmentation in sampler.test():
+                trainer = RandTrainer(cfg, augmentation=augmentation)
+                trainer.resume_or_load(resume=args.resume)
+                trainer.train()
+
+
             
 
 if __name__ == "__main__":

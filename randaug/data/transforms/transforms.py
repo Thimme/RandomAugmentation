@@ -9,12 +9,13 @@ from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
 from fvcore.transforms.transform import Transform
 from randaug.data.transforms.corruptions import corrupt
-from randaug.data.albumentations import AlbumentationsTransform, prepare_param
+from randaug.data.albumentations import AlbumentationsTransform
 from enum import Enum
 from randaug.data.transforms.box_transforms import SimpleBBTransform, AdjustBBTransform, SimilarityBBTransform, OutputBBTransform, CLIPBBTransform, DINOBBTransform, SaveTransform, CutoutBBTransform
 from torchvision import transforms as v1
+import cv2
 
-MAGNITUDE_BINS = 5 
+MAGNITUDE_BINS = 10 
 DATA_PATH = "/mnt/ssd2/dataset/" 
 
 class Augmentations(Enum):
@@ -27,6 +28,8 @@ class Augmentations(Enum):
     CYCLE_DIFFUSION = 'cyclediffusion'
     STABLE_DIFFUSION = 'stablediffusion'
     MGIE_DIFFUSION = 'mgiediffusion'
+    PLUG_DIFFUSION = 'plugdiffusion'
+    CONTROL_DIFFUSION = 'controldiffusion'
     FOG = 'fog'
     RAIN = 'rain'
     SNOW = 'snow'
@@ -51,12 +54,44 @@ class Augmentations(Enum):
     RAND_AUGMENT = 'randaugment'
     TRIVIAL_WIDE = 'trivialwide'
     AUG_MIX = 'augmix'
+    CHANNEL_DROPOUT = 'channel_dropout'
+    DEFOCUS = 'defocus'
+    ZOOM_BLUR = 'zoom_blur'
+    ADDITIVE_NOISE = 'additive_noise'
+    CHANNEL_SHUFFLE = 'channel_shuffle'
+    CHROMATIC_ABERRATION = 'chromatic_aberration'
+    COLOR_JITTER = 'color_jitter'
+    EMBOSS = 'emboss'
+    HUE_SATURATION_VALUE = 'hue_saturation_value'
+    ISO_NOISE = 'iso_noise'
+    PIXEL_DROPOUT = 'pixel_dropout'
+    PLASMA_BRIGHTNESS_CONTRAST = 'plasma_brightness_contrast'
+    RANDOM_FOG = 'random_fog'
+    RANDOM_GAMMA = 'random_gamma'
+    RANDOM_RAIN = 'random_rain'
+    RANDOM_SNOW = 'random_snow'
+    RANDOM_GRAVEL = 'random_gravel'
+    SALT_AND_PEPPER = 'salt_and_pepper'
+    SHOT_NOISE = 'shot_noise'
+    GLASS_BLUR = 'glass_blur'
+    MOTION_BLUR = 'motion_blur'
+    GAUSSIAN_NOISE = 'gaussian_noise'
+
 
 def random_invert(number):
     if random.choice([True, False]):
         return -number
     else:
         return number
+
+def sample_magnitude(magnitude, lower_bound, upper_bound, invert=True, num_bins=10):
+    v = np.linspace(lower_bound, upper_bound, num_bins)
+    max_value = v[magnitude]  # upper bound from v based on magnitude
+    value = random.uniform(lower_bound, max_value)
+    if invert:
+        return random_invert(value)
+    else:
+        return value
 
 # Own augmentations
 class FogAugmentation(T.Augmentation):
@@ -68,7 +103,8 @@ class FogAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        return WeatherTransform(name=str(self.name), severity=self.magnitude)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        return WeatherTransform(name=str(self.name), severity=int(v))
     
 
 class RainAugmentation(T.Augmentation):
@@ -80,7 +116,8 @@ class RainAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        return WeatherTransform(name=str(self.name), severity=self.magnitude)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        return WeatherTransform(name=str(self.name), severity=int(v))
 
 
 class SnowAugmentation(T.Augmentation):
@@ -92,7 +129,8 @@ class SnowAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        return WeatherTransform(name=str(self.name), severity=self.magnitude)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        return WeatherTransform(name=str(self.name), severity=int(v))
 
 
 # run on GPU
@@ -112,7 +150,8 @@ class DropAugmentation(T.Augmentation):
             return device
         
     def get_transform(self, image):
-        return WeatherTransform(name=str(self.name), severity=self.magnitude, device=self.device)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        return WeatherTransform(name=str(self.name), severity=int(v), device=self.device)
     
 
 class CycleGANFogAugmentation(T.Augmentation):
@@ -308,6 +347,82 @@ class MGIEDiffusionSnowAugmentation(T.Augmentation):
     def get_transform(self, image, file_name):
         return MGIETransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
     
+class PlugPlayFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.PLUG_DIFFUSION
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude#
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
+    
+
+class PlugPlayRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.PLUG_DIFFUSION
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
+    
+
+class PlugPlaySnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.PLUG_DIFFUSION
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
+
+class ControlNetFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CONTROL_DIFFUSION
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
+    
+
+class ControlNetRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CONTROL_DIFFUSION
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
+    
+
+class ControlNetSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CONTROL_DIFFUSION
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
+    
 
 class ComfyUIAugmentation(T.Augmentation):
     
@@ -337,11 +452,10 @@ class ShearXAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        v = np.linspace(5, 25, num=MAGNITUDE_BINS) # Shear in degrees 
+        v = np.linspace(3, 30, num=MAGNITUDE_BINS) # Shear in degrees 
         v = random_invert(number=v)
-        transform = A.Affine(shear={'x': v[self.magnitude], 'y': 0})
-        params = prepare_param(transform, image)
-        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
+        transform = A.Affine(shear={"x": (0, v[self.magnitude]), "y": (0, 0)}, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
 class ShearYAugmentation(T.Augmentation):
@@ -353,11 +467,11 @@ class ShearYAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(5, 25, num=MAGNITUDE_BINS) # Shear in degrees 
+        v = sample_magnitude(self.magnitude, lower_bound=0, upper_bound=30, invert=True)
+        v = np.linspace(3, 30, num=MAGNITUDE_BINS) # Shear in degrees 
         v = random_invert(number=v)
-        transform = A.Affine(shear={'x': 0, 'y': v[self.magnitude]})
-        params = prepare_param(transform, image)
-        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
+        transform = A.Affine(shear={"x": (0, 0), "y": (0, v[self.magnitude])}, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
 class TranslateXAugmentation(T.Augmentation):
@@ -371,9 +485,8 @@ class TranslateXAugmentation(T.Augmentation):
     def get_transform(self, image): 
         v = np.linspace(0.1, 0.45, num=MAGNITUDE_BINS)
         v = random_invert(number=v)
-        transform = A.Affine(translate_percent={'x': v[self.magnitude], 'y': 0})
-        params = prepare_param(transform, image)
-        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))
+        transform = A.Affine(translate_percent={"x": (0, v[self.magnitude]), "y": (0, 0)}, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
 class TranslateYAugmentation(T.Augmentation):
@@ -387,12 +500,9 @@ class TranslateYAugmentation(T.Augmentation):
     def get_transform(self, image):
         v = np.linspace(0.1, 0.45, num=MAGNITUDE_BINS)
         v = random_invert(number=v)
-        transform = A.Affine(translate_percent={'x': 0, 'y': v[self.magnitude]})
-        params = prepare_param(transform, image)
-        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))  
+        transform = A.Affine(translate_percent={"x": (0, 0), "y": (0, v[self.magnitude])}, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
 
-
-# retrain (magnitude was -1)
 class RotationAugmentation(T.Augmentation):
      
     def __init__(self, magnitude=1, cfg=None):
@@ -402,13 +512,11 @@ class RotationAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        angle = np.linspace(5, 30, num=MAGNITUDE_BINS)
+        angle = np.linspace(3, 30, num=MAGNITUDE_BINS)
         angle = random_invert(number=angle)
-        transform = A.Affine(rotate=angle[self.magnitude])
-        params = prepare_param(transform, image)
-        return AlbumentationsTransform(transform, params, size=(image.shape[:2]))  
-        #return T.RotationTransform(h, w, angle[self.magnitude])
-    
+        transform = A.Affine(rotate=(1, angle[self.magnitude]), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])  
+        
 
 class AutoContrastAugmentation(T.Augmentation):
      
@@ -458,8 +566,8 @@ class SolarizeAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(256, 0, num=MAGNITUDE_BINS)
-        func = lambda x: ImageOps.solarize(x, v[self.magnitude])
+        v = sample_magnitude(self.magnitude, lower_bound=230, upper_bound=0, invert=False)
+        func = lambda x: ImageOps.solarize(x, int(v))
         return T.PILColorTransform(func)
 
 
@@ -472,8 +580,8 @@ class PosterizeAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(8, 1, num=MAGNITUDE_BINS)
-        func = lambda x: ImageOps.posterize(x, int(v[self.magnitude]))
+        v = sample_magnitude(self.magnitude, lower_bound=8, upper_bound=1, invert=False)
+        func = lambda x: ImageOps.posterize(x, int(v))
         return T.PILColorTransform(func)
 
 
@@ -486,8 +594,8 @@ class ContrastAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: ImageEnhance.Contrast(x).enhance(v[self.magnitude])
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, invert=True)
+        func = lambda x: ImageEnhance.Contrast(x).enhance(1 + v)
         return T.PILColorTransform(func)    
 
 
@@ -500,8 +608,8 @@ class ColorAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.0, num=MAGNITUDE_BINS)
-        func = lambda x: ImageEnhance.Color(x).enhance(v[self.magnitude])
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, invert=False)
+        func = lambda x: ImageEnhance.Color(x).enhance(1 - v)
         return T.PILColorTransform(func)
     
 
@@ -514,8 +622,8 @@ class BrightnessAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: ImageEnhance.Brightness(x).enhance(v[self.magnitude])
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, invert=True)
+        func = lambda x: ImageEnhance.Brightness(x).enhance(1 + v)
         return T.PILColorTransform(func)
     
 
@@ -528,8 +636,8 @@ class SharpnessAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(0.1, 1.9, num=MAGNITUDE_BINS)
-        func = lambda x: ImageEnhance.Sharpness(x).enhance(v[self.magnitude])
+        v = sample_magnitude(self.magnitude, lower_bound=1.0, upper_bound=2.0, invert=False)
+        func = lambda x: ImageEnhance.Sharpness(x).enhance(v)
         return T.PILColorTransform(func)
     
 
@@ -542,13 +650,9 @@ class CutoutAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = np.linspace(1, 10, num=MAGNITUDE_BINS)
-        m = int(v[self.magnitude])
-        transform = A.CoarseDropout(min_holes=m, max_holes=m*8, 
-                                    min_height=m, max_height=m*12, 
-                                    min_width=m, max_width=m*12, p=1.0)
-        params = prepare_param(transform, image)
-        return AlbumentationsTransform(transform, params, size=image.shape[:2])
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        transform = A.CoarseDropout(num_holes_range=(1, int(v)), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
 class BoundingboxAugmentation(T.Augmentation):
@@ -658,7 +762,7 @@ class WeatherTransform(Transform):
     def __init__(self, name, severity, device=None):
         super().__init__()
         self.name = name
-        self.severity = severity + 1
+        self.severity = severity
         self.device = device
 
     def apply_image(self, img: np.ndarray):
@@ -871,7 +975,6 @@ class AutoAugmentTransform(Transform):
         else:
             return NotImplementedError
 
-
     def apply_image(self, img: np.ndarray):
         img = self.transform(Image.fromarray(img)) # type: ignore
         return np.array(img)
@@ -881,3 +984,311 @@ class AutoAugmentTransform(Transform):
     
     def apply_segmentation(self, segmentation):
         return segmentation
+    
+
+
+# Albumentations
+
+class AdditiveNoise(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.ADDITIVE_NOISE
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        std = np.linspace(0.1, 0.5, MAGNITUDE_BINS)
+        transform = A.AdditiveNoise(noise_type="gaussian", spatial_mode="shared", 
+                                    noise_params={"mean_range": (0.0, 0.0), "std_range": (0.05, std[self.magnitude])}, 
+                                    p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+class ChannelShuffle(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CHANNEL_SHUFFLE
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        transform = A.ChannelShuffle(p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+class ChromaticAberration(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CHROMATIC_ABERRATION
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.05, 5, MAGNITUDE_BINS)
+        transform = A.ChromaticAberration(primary_distortion_limit=(0.0, v[self.magnitude]), 
+                                          secondary_distortion_limit=(-0.05, 0.05), mode='random', 
+                                          interpolation=cv2.INTER_LINEAR, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+class ColorJitter(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.COLOR_JITTER
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.1, 1, MAGNITUDE_BINS)
+        transform = A.ColorJitter(brightness=v[self.magnitude], contrast=v[self.magnitude], 
+                                  saturation=v[self.magnitude], p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+class Emboss(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.EMBOSS
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.1, 1, MAGNITUDE_BINS)
+        transform = A.Emboss(alpha=(v[self.magnitude], 1.0), strength=(v[self.magnitude], 1.0), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+class HueSaturationValue(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.HUE_SATURATION_VALUE
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(10, 100, MAGNITUDE_BINS)
+        transform = A.HueSaturationValue(hue_shift_limit=v[self.magnitude], 
+                                         sat_shift_limit=v[self.magnitude], 
+                                         val_shift_limit=v[self.magnitude], p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+class IsoNoise(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.ISO_NOISE
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.1, 1.0, MAGNITUDE_BINS)
+        transform = A.ISONoise(color_shift=(0.01, 1), intensity=(0.1, v[self.magnitude]), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+# checkpoint
+
+class PixelDropout(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.PIXEL_DROPOUT
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=0.9, invert=False)
+        transform = A.PixelDropout(dropout_prob=v, per_channel=True, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+
+class PlasmaBrightnessContrast(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.PLASMA_BRIGHTNESS_CONTRAST
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.1, 1.0, MAGNITUDE_BINS)
+        transform = A.PlasmaBrightnessContrast(brightness_range=(-v[self.magnitude], v[self.magnitude]), 
+                                               contrast_range=(-v[self.magnitude], v[self.magnitude]), roughness=5, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+
+class RandomFog(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.RANDOM_FOG
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.1, 1.0, MAGNITUDE_BINS)
+        transform = A.RandomFog(alpha_coef=0.08, fog_coef_range=(0.05, v[self.magnitude]), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class RandomGamma(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.RANDOM_GAMMA
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=10, upper_bound=100, invert=False)
+        transform = A.RandomGamma(gamma_limit=(80 + v, 120), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+    
+
+class RandomGravel(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.RANDOM_GRAVEL
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=5, upper_bound=50, invert=False)
+        transform = A.RandomGravel(gravel_roi=(0.0, 0.0, 1.0, 1.0), number_of_patches=int(v), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class RandomRain(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.RANDOM_RAIN
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        rain_type = 'default'
+        if v <= 2:
+            rain_type = 'drizzle'
+        elif v <= 5:
+            rain_type = 'default'
+        elif v <= 8:
+            rain_type = 'heavy'
+        else:
+            rain_type = 'torrential'
+        
+        transform = A.RandomRain(rain_type=rain_type, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class RandomSnow(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.RANDOM_SNOW
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(0.1, 1, MAGNITUDE_BINS)
+        transform = A.RandomSnow(snow_point_range=(v[self.magnitude], 1.0), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class SaltAndPepper(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.SALT_AND_PEPPER
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=0.01, upper_bound=0.25, invert=False)
+        transform = A.SaltAndPepper(amount=(0.01, v), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class ShotNoise(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.SHOT_NOISE
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=0.05, upper_bound=0.5, invert=False)
+        transform = A.ShotNoise(scale_range=(0.01, v), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class GlassBlur(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.GLASS_BLUR
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1.0, invert=False)
+        transform = A.GlassBlur(sigma=v, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class MotionBlur(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.MOTION_BLUR
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = np.linspace(5, 25, MAGNITUDE_BINS)
+        transform = A.MotionBlur(blur_limit=(3, int(v[self.magnitude])), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class ZoomBlur(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.ZOOM_BLUR
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=1.03, upper_bound=1.3, invert=False)
+        transform = A.ZoomBlur(max_factor=(1, v), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class Defocus(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.DEFOCUS
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        v = sample_magnitude(self.magnitude, lower_bound=5, upper_bound=15, invert=False)
+        transform = A.Defocus(radius=(3, int(v)), p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
+
+
+class ChannelDropout(T.Augmentation):
+     
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CHANNEL_DROPOUT
+        self.magnitude = magnitude
+        self.cfg = cfg
+        
+    def get_transform(self, image):
+        transform = A.ChannelDropout(channel_drop_range=(1, 1), fill=0, p=1.0)
+        return AlbumentationsTransform(transform, size=image.shape[:2])
