@@ -119,14 +119,15 @@ def custom_setup_backbone_augmentation(cfg):
         cfg.cutout_postprocessing = True
     return cfg
 
-def custom_setup(cfg):
+def custom_setup_cyclegan_cut(cfg):
     if 'detr' in cfg.network:
         cfg.cutout_postprocessing = False
     return cfg
 
 def evaluate_experiment(args):
-    setup_funcs = [setup_frcnn_r101, setup_detr_r101, setup_retinanet_r101, setup_detr_r101_dc5, setup_frcnn_r101_dc5, setup_frcnn, setup_detr, setup_retinanet]
-
+    setup_funcs = [setup_detr_r101_dc5, setup_frcnn_r101_dc5]
+    #setup_funcs = [setup_retinanet_r101]
+    
     for _ in range(args.iterations):
         for setup_func in setup_funcs:
             cfg = setup_func(args)
@@ -139,7 +140,12 @@ def evaluate_experiment(args):
             cfg.SOLVER.MAX_ITER = 10000
             cfg.TEST.EVAL_PERIOD = 1000
             cfg.DATALOADER.NUM_WORKERS = 0
-            cfg = custom_setup(cfg)
+
+            if args.experiment_name == 'experiment_backbone_augmentation':
+                cfg = custom_setup_backbone_augmentation(cfg)
+            elif args.experiment_name == 'experiment_backbone_cyclegan':
+                cfg = custom_setup_cyclegan_cut(cfg)
+
             default_setup(cfg, args)
 
             # Set the configuration parameters 
