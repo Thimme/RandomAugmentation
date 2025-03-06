@@ -729,17 +729,9 @@ class AugMixAugmentation(T.Augmentation):
 # Wrapper class for random augmentations
 class RandomAugmentation():
     
-    def __init__(self, cfg, M, augmentations):
+    def __init__(self, cfg, augmentations):
         self.cfg = cfg
-        self.M = M # list of magnitudes
         self.augmentations = augmentations # list of transforms
-    
-    def __repr__(self):
-        if len(self.augmentations):
-            repr = '-'.join([f'{t.__class__.__name__}-{m}' for t, m in zip(self.augmentations, self.M)])
-        else:
-            repr = "no-augmentation"
-        return f'{self.cfg.rand_N}-{repr}'
     
     def get_transforms(self):
         return self.augmentations + self._append_standard_flip() + self._append_standard_transform()

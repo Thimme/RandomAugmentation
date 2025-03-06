@@ -167,7 +167,7 @@ class RandTrainer(TrainerBase):
         ]
 
         def test_and_save_results():
-            self._last_eval_results = self.test(self.cfg, self.model, augmentation=str(self.rand_aug), iteration=self._trainer.iter)
+            self._last_eval_results = self.test(self.cfg, self.model, iteration=self._trainer.iter)
             return self._last_eval_results
 
         # Do evaluation after checkpointer, because then if it fails,
@@ -285,7 +285,7 @@ class RandTrainer(TrainerBase):
         return build_detection_test_loader(cfg, dataset_name)
 
     @classmethod
-    def test(cls, cfg, model, evaluators=None, augmentation=None, iteration=0):
+    def test(cls, cfg, model, evaluators=None, iteration=0):
         """
         Evaluate the given model. The given model is expected to already contain
         weights to evaluate.
@@ -337,12 +337,14 @@ class RandTrainer(TrainerBase):
                 print_csv_format(results_i)
                 
                 results_a = flatten_results_dict(results_i.copy())
-                results_a["augmentation"] = augmentation
                 results_a["dataset"] = dataset_name
                 results_a["algorithm"] = cfg.network
-                results_a["experiment"] = cfg.experiment_name + '_bbox' if cfg.box_postprocessing else cfg.experiment_name
-                results_a["experiment"] = results_a["experiment"] + '_cutout' if cfg.cutout_postprocessing else results_a["experiment"]
+                results_a["experiment"] = cfg.experiment_name
+                results_a["bbox"] = cfg.box_postprocessing
+                results_a["cutout"] = cfg.cutout_postprocessing
+                results_a["frozen"] = cfg.frozen_backbone
                 results_a["iterations"] = iteration + 1
+                results_a["magnitude"] = cfg.magnitude
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:

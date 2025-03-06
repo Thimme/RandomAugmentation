@@ -28,12 +28,13 @@ diffusion_transforms = [
     "MGIEDiffusionFogAugmentation",
     "MGIEDiffusionRainAugmentation",
     "MGIEDiffusionSnowAugmentation",
-    # "PlugPlayFogAugmentation",
-    # "PlugPlayRainAugmentation",
-    # "PlugPlaySnowAugmentation",
-    # "ControlNetFogAugmentation",
-    # "ControlNetRainAugmentation",
-    # "ControlNetSnowAugmentation",
+    "PlugPlayFogAugmentation",
+    "PlugPlayRainAugmentation",
+    "PlugPlaySnowAugmentation",
+    "ControlNetFogAugmentation",
+    "ControlNetRainAugmentation",
+    "ControlNetSnowAugmentation",
+    "ComfyUIAugmentation"
 ]
 
 ai_transforms = [
@@ -52,13 +53,6 @@ ai_conditions = [
 
 image_transforms = [
     "ColorAugmentation",
-    "ShearXAugmentation",
-    "ShearYAugmentation",
-    "FogAugmentation",
-    "SnowAugmentation",
-    "RainAugmentation",
-    "TranslateXAugmentation",
-    "TranslateYAugmentation",
     "AutoContrastAugmentation",
     "InvertAugmentation",
     "EqualizeAugmentation",
@@ -67,14 +61,31 @@ image_transforms = [
     "ContrastAugmentation",
     "BrightnessAugmentation",
     "SharpnessAugmentation",
-    "CutoutAugmentation",
-    "DropAugmentation",
-    "RotationAugmentation",
-    #"AutoAugmentAugmentation",
-    #"RandAugmentAugmentation",
-    #"TrivialWideAugmentation",
-    #"AugMixAugmentation"
+    "Defocus",
+    "ZoomBlur",
+    "MotionBlur",
+    "GlassBlur",
+    "ShotNoise",
+    "SaltAndPepper",
+    "RandomSnow",
+    "RandomRain",
+    "RandomGravel", 
+    "RandomGamma",
+    "RandomFog",
+    "PlasmaBrightnessContrast",
+    "IsoNoise",
+    "HueSaturationValue",
+    "Emboss",
+    "ColorJitter",
+    "ChromaticAberration",
+    "ChannelShuffle",
+    "AdditiveNoise"
 ]
+
+dropout_transforms = ["CutoutAugmentation", "ChannelDropout", "PixelDropout"]
+weather_transforms = [ "FogAugmentation", "SnowAugmentation", "RainAugmentation", "DropAugmentation"]
+autoaugment_transforms = ["AutoAugmentAugmentation", "RandAugmentAugmentation", "TrivialWideAugmentation", "AugMixAugmentation"]
+geometric_transforms = ["ShearXAugmentation", "ShearYAugmentation", "TranslateXAugmentation", "TranslateYAugmentation", "RotationAugmentation"]
 
 NUM_DATASETS = 32
 
@@ -159,7 +170,7 @@ class TransformSampler():
         ops = self._sample_augmentation(magnitude=self.cfg.rand_M)
         ops = self._filter_image_augmentations(ops)
         augs = [self._map_to_transforms(op) for op in ops]
-        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[0]) for aug in augs]
         print(f"Start from epoch: {self.epochs}")
         return augs[self.epochs:]
     
@@ -167,27 +178,34 @@ class TransformSampler():
         ops = self._sample_augmentation(magnitude=None)
         ops = self._filter_image_augmentations(ops)
         augs = [self._map_to_transforms(op) for op in ops]
-        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[0]) for aug in augs]
         return augs
         
     def no_augmentation(self):
-        return [RandomAugmentation(self.cfg, 1, [])]
+        return [RandomAugmentation(self.cfg, [])]
     
     def test(self, magnitude=0):
         #return [RandomAugmentation(self.cfg, 1, [])]
         #return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), ShearXAugmentation(magnitude=1, cfg=self.cfg), SnowAugmentation(magnitude=2, cfg=self.cfg)])]
-        return [RandomAugmentation(self.cfg, 1, [DropAugmentation(magnitude=magnitude, cfg=self.cfg)])]
+        return [RandomAugmentation(self.cfg, [DropAugmentation(magnitude=magnitude, cfg=self.cfg)])]
         #return [RandomAugmentation(self.cfg, 1, [ComfyUIAugmentation(experiment="experiment_032_rain", cfg=self.cfg), RainAugmentation(magnitude=4, cfg=self.cfg)])]
     
     def diffusion_search(self):
         ops = self._sample_diffusion_models(ids=[0])
         augs = [self._map_to_transforms(op) for op in ops] 
-        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[0]) for aug in augs]
         return augs
     
     def experiment(self, experiment: str):
         augs = [ComfyUIAugmentation(experiment=experiment, cfg=self.cfg)]
-        augs = [RandomAugmentation(self.cfg, [0], [aug]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, [aug]) for aug in augs]
+        return augs
+    
+    def augmentation(self, augmentation: str, magnitude: int):
+        aug_class = getattr(sys.modules[__name__], augmentation)
+        aug = aug_class(magnitude=magnitude, cfg=self.cfg)
+        return [RandomAugmentation(self.cfg, [aug])]
+        augs = [RandomAugmentation(self.cfg, [aug]) for aug in [augmentation]]
         return augs
     
     def sample_output(self, magnitude=0):
@@ -201,7 +219,7 @@ class TransformSampler():
             aug = [(t, self._magnitude(magnitude)) for t in transform]
             ops.append(aug)
         augs = [self._map_to_transforms(op) for op in ops]
-        augs = [RandomAugmentation(self.cfg, aug[1], aug[0]) for aug in augs]
+        augs = [RandomAugmentation(self.cfg, aug[0]) for aug in augs]
         return augs
 
 
