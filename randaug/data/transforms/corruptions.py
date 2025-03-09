@@ -56,8 +56,8 @@ def corrupt(image, severity=1, corruption_name=None, corruption_number=-1, devic
     if channels == 1:
         image = np.stack((np.squeeze(image),)*3, axis=-1)
     
-    if not severity in [1,2,3,4,5]:
-        raise AttributeError('Severity must be an integer in [1, 5]')
+    if severity not in range(1, 11):
+        raise ValueError("Severity must be an integer between 1 and 10")
     
     if not (corruption_name is None):
         image_corrupted = corruption_dict[corruption_name](Image.fromarray(image),

@@ -285,11 +285,16 @@ def next_power_of_2(x):
 
 
 def fog(x, severity=1, device=None):
-    c = [(1.5, 2), 
-         (2., 2), 
-         (3, 1.7),
-         (4, 1.5),
-         (5., 1.4)][severity - 1]
+    c = [(1.0, 1.85), 
+         (1.5, 1.85), 
+         (2.0, 1.85),
+         (2.5, 1.85),
+         (3.0, 1.85),
+         (3.5, 1.8),
+         (4.0, 1.75),
+         (4.5, 1.7),
+         (5.0, 1.65),
+         (5.5, 1.6)][severity - 1]
 
     shape = np.array(x).shape
     max_side = np.max(shape)
@@ -366,11 +371,16 @@ def rgb2gray(rgb):
 
 
 def rain(x, severity=1, device=None):
-    c = [(0.1, 0.5, 1.5, 0.8, 10, 14, 0.9),
-         (0.2, 0.5, 1.5, 0.8, 10, 14, 0.9),
-         (0.2, 0.55, 1.5, 0.8, 10, 14, 0.9),
-         (0.3, 0.55, 1.5, 0.8, 10, 14, 0.9),
-         (0.4, 0.55, 1.5, 0.8, 10, 14, 0.9)][severity - 1]
+    c = [(0.2, 0.3, 2.0, 0.8, 10, 14, 0.9),
+         (0.25, 0.35, 2.0, 0.8, 10, 14, 0.9),
+         (0.3, 0.45, 1.8, 0.8, 10, 14, 0.9),
+         (0.35, 0.45, 1.8, 0.8, 10, 14, 0.9),
+         (0.35, 0.5, 1.6, 0.8, 10, 14, 0.9),
+         (0.4, 0.55, 1.6, 0.8, 10, 14, 0.9),
+         (0.45, 0.6, 1.5, 0.8, 10, 14, 0.9),
+         (0.45, 0.65, 1.5, 0.8, 10, 14, 0.9),
+         (0.5, 0.7, 1.5, 0.8, 10, 14, 0.9),
+         (0.55, 0.75, 1.5, 0.8, 10, 14, 0.9)][severity - 1]
 
     x = np.array(x, dtype=np.float32) / 255.
     alpha = 0.4
@@ -414,11 +424,16 @@ def rain(x, severity=1, device=None):
 
 
 def snow(x, severity=1, device=None):
-    c = [(0.2, .45, 1.5, .85, 6, 2, 0.9),
-         (0.2, .4, 1.4, .7, 6, 2, 0.9),
-         (0.2, .5, 1.7, .8, 6, 2, 0.9),
-         (0.35, .6, 2.7, 1.1, 6, 2, 0.9),
-         (0.35, .65, 3.2, 1.1, 6, 2, 0.9)][severity - 1]
+    c = [(0.2, .3, 3.5, .85, 6, 2, 0.95),
+         (0.2, .4, 3.8, .7, 6, 2, 0.95),
+         (0.2, .5, 4.1, .8, 6, 2, 0.95),
+         (0.2, .6, 4.4, .9, 6, 2, 0.95),
+         (0.2, .7, 4.7, 1, 6, 2, 0.95),
+         (0.2, .8, 4.7, 1.1, 6, 2, 0.95),
+         (0.2, .9, 4.7, 1.1, 6, 2, 0.95),
+         (0.2, 1, 4.7, 1.1, 6, 2, 0.95),
+         (0.2, 1.1, 4.7, 1.1, 6, 2, 0.95),
+         (0.2, 1.2, 4.7, 1.1, 6, 2, 0.95)][severity - 1]
     
     loc, scale = c[0], c[1]
     zoom = c[2]
@@ -447,15 +462,14 @@ def snow(x, severity=1, device=None):
     # reduce opacity of snowflakes
     if len(x.shape) < 3 or x.shape[2] < 3:
         x = alpha * x + (1 - alpha) * np.maximum(x, x.reshape(x.shape[0],
-                                                            x.shape[
-                                                                1]) * 1.5 + 0.5)
+                                                              x.shape[1]) * 1.5 + 0.5)
         snow_layer = snow_layer.squeeze(-1)
     else:
         x = alpha * x + (1 - alpha) * np.maximum(x, cv2.cvtColor(x,
                                                                cv2.COLOR_RGB2GRAY).reshape(
             x.shape[0], x.shape[1], 1) * 1.5 + 0.5)
     try:
-        alpha_snow = 0.4
+        alpha_snow = 0.5
         snow_layer = snow_layer + np.rot90(snow_layer, k=2)
         snow_layer = np.dstack((snow_layer, snow_layer, snow_layer)).astype(np.float32)
         x = cv2.addWeighted(x, 1.0, snow_layer, alpha_snow, 0)
@@ -645,10 +659,15 @@ def elastic_transform(image, severity=1, device=None):
 def drops(image, severity=1, device=None):    
     # render on GPU
     c = [(20, 3, 0.9, 3),
-         (30, 5, 0.8, 3),
-         (40, 6, 0.8, 4),
-         (45, 7, 0.8, 4),
-         (50, 8, 0.5, 4)][severity - 1]
+         (25, 5, 0.8, 3),
+         (30, 6, 0.8, 4),
+         (35, 7, 0.8, 4),
+         (40, 8, 0.5, 4),
+         (45, 8, 0.5, 4),
+         (50, 9, 0.5, 5),
+         (55, 10, 0.4, 5),
+         (60, 11, 0.4, 5),
+         (65, 12, 0.4, 6)][severity - 1]
 
     drops_size = c[0]
     drops_frequency = c[1]

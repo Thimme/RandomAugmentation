@@ -169,7 +169,7 @@ class DropModel:
     
 
     def get_normal_map(self):
-        numdrops = self.get_numdrops() / 1.5 # reduce drops to reduce memory overhead on gpus (1.7 - 1.8)
+        numdrops = self.get_numdrops() / 1.2 # reduce drops to reduce memory overhead on gpus (1.7 - 1.8)
         numdrops_total = int(numdrops.sum().item())
         drops_sizes = self.get_drops_sizes()
         #drops_stock = self.get_drop_stock(numdrops_total).to(dtype=torch.float16)

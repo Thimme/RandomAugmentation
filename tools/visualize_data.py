@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 import sys
-sys.path.append("/home/rothmeier/Documents/github/RandomAugmentation/") # bad code
+sys.path.append("/home/rothmeier/Documents/github/RandomAugmentation") # bad code
 
 import argparse
 import os
@@ -18,7 +18,7 @@ from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import Visualizer
 from randaug.data import datasets
 from randaug.engine.rand_trainer import RandTrainer
-from randaug.engine.transform_sampler import TransformSampler
+from randaug.engine.transform_sampler import TransformSampler, dropout_transforms, image_transforms, weather_transforms, geometric_transforms, gan_transforms, diffusion_transforms
 from PIL import Image
 
 
@@ -32,6 +32,8 @@ def setup(args):
     cfg.rand_M = 4 # magnitude of transforms
     #cfg.INPUT.FORMAT = "BGR"
     cfg.box_postprocessing = False
+    cfg.cutout_postprocessing = False
+    cfg.magnitude_fixed = True
     cfg.freeze()
     return cfg
 
@@ -92,7 +94,7 @@ if __name__ == "__main__":
         return dst
         
     def visualize_image(img, instances) -> Visualizer:
-        visualizer = Visualizer(img, metadata=metadata, scale=scale)
+        visualizer = Visualizer(img, metadata=metadata, scale=1.0)
         target_fields = instances.get_fields()
         labels = [metadata.thing_classes[i] for i in target_fields["gt_classes"]]
         vis = visualizer.overlay_instances(
@@ -125,40 +127,47 @@ if __name__ == "__main__":
         resized_image = cropped_image.resize((target_width, target_height), Image.ANTIALIAS)
         return resized_image
 
-    scale = 1.0
-    if args.source == "dataloader":
-        sampler = TransformSampler(cfg, epochs=0)
-        transforms = sampler.test()
-        train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=transforms[0].get_transforms())
+    def sample(augmentation, magnitude):
+        if args.source == "dataloader":
+            sampler = TransformSampler(cfg, epochs=0)
+            transforms = sampler.augmentation(augmentation=augmentation, magnitude=magnitude)
+            train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=transforms[0].get_transforms())
 
-        for batch in train_data_loader:
-            for per_image in batch:
-                # Pytorch tensor is in (C, H, W) format
-                #print(per_image)
-                img = per_image["image"].permute(1, 2, 0).cpu().detach().numpy()
-                img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
-                file_id = per_image['image_id']
-                img = Image.fromarray(img)
-                img.save(os.path.join(dirname, file_id + '.jpg'))
-                continue
-                #vis = visualize_image(img, per_image["instances"])
+            for batch in train_data_loader:
+                for per_image in batch:
+                    # Pytorch tensor is in (C, H, W) format
+                    #print(per_image)
+                    img = per_image["image"].permute(1, 2, 0).cpu().detach().numpy()
+                    img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
+                    file_id = per_image['image_id']
+                    img = Image.fromarray(img)
+                    #img.save(os.path.join(dirname, file_id + '.jpg'))
+                    #break
+                    vis = visualize_image(img, per_image["instances"])
 
-                if args.concat:
-                    # exchange with original bounding boxes
-                    img2 = Image.fromarray(vis.get_image())
-                    img1 = Image.open(os.path.join(args.data, file_id + '.jpg')) # original file path
-                    img1 = center_crop_and_resize(img1, img2)
-                    concat_image = concat_h(img1, img2)
-                    concat_image.save(os.path.join(dirname, file_id + '.jpg'))
-                else:
-                    output(vis, str(file_id) + ".jpg")
-    else:
-        dicts = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TRAIN]))
-        if cfg.MODEL.KEYPOINT_ON:
-            dicts = filter_images_with_few_keypoints(dicts, 1)
-        for dic in tqdm.tqdm(dicts):
-            img = utils.read_image(dic["file_name"], "RGB")
-            visualizer = Visualizer(img, metadata=metadata, scale=scale)
-            vis = visualizer.draw_dataset_dict(dic)
-            output(vis, os.path.basename(dic["file_name"]))
+                    if args.concat:
+                        # exchange with original bounding boxes
+                        img2 = Image.fromarray(vis.get_image())
+                        img1 = Image.open(os.path.join(args.data, file_id + '.jpg')) # original file path
+                        img1 = center_crop_and_resize(img1, img2)
+                        concat_image = concat_h(img1, img2)
+                        concat_image.save(os.path.join(dirname, file_id + '.jpg'))
+                    else:
+                        output(vis, f"{magnitude}_{file_id}.jpg")
+                    break
+                break
+        else:
+            dicts = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TRAIN]))
+            if cfg.MODEL.KEYPOINT_ON:
+                dicts = filter_images_with_few_keypoints(dicts, 1)
+            for dic in tqdm.tqdm(dicts):
+                img = utils.read_image(dic["file_name"], "RGB")
+                visualizer = Visualizer(img, metadata=metadata, scale=scale)
+                vis = visualizer.draw_dataset_dict(dic)
+                output(vis, os.path.basename(dic["file_name"]))
+
+    transforms = diffusion_transforms[15:]
+    for t in transforms:
+        for i in range(0,10):
+            sample(t, i)
 
