@@ -101,6 +101,7 @@ def add_arguments():
     parser.add_argument("--iterations", type=int, default=3, help="Specify the number of itations")
     parser.add_argument("--weather", type=str, default="diverse", help="Specify an extra tag to separate datasets")
     parser.add_argument("--magnitude", type=int, default="0", help="Specify the applied magnitude")
+    parser.add_argument("--magnitude-fixed", action='store_true', help="Specify if the magnitude is fixed")
     return parser
 
 def custom_setup_backbone_augmentation(cfg):
@@ -138,6 +139,7 @@ def experiment(args):
             cfg.aug_prob = 1.0
             cfg.magnitude = magnitude
             cfg.experiment_name = aug
+            cfg.magnitude_fixed = args.magnitude_fixed
             
             # if args.experiment_name == 'experiment_backbone_augmentation':
             #     cfg = custom_setup_backbone_augmentation(cfg)

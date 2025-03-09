@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 import sys
-sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation/") # bad code
+sys.path.append("/home/rothmeier/Documents/github/RandomAugmentation") # bad code
 
 import argparse
 import os
@@ -18,7 +18,7 @@ from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import Visualizer
 from randaug.data import datasets
 from randaug.engine.rand_trainer import RandTrainer
-from randaug.engine.transform_sampler import TransformSampler
+from randaug.engine.transform_sampler import TransformSampler, dropout_transforms, image_transforms, weather_transforms, geometric_transforms, gan_transforms, diffusion_transforms
 from PIL import Image
 
 
@@ -33,6 +33,7 @@ def setup(args):
     #cfg.INPUT.FORMAT = "BGR"
     cfg.box_postprocessing = False
     cfg.cutout_postprocessing = False
+    cfg.magnitude_fixed = True
     cfg.freeze()
     return cfg
 
@@ -126,10 +127,10 @@ if __name__ == "__main__":
         resized_image = cropped_image.resize((target_width, target_height), Image.ANTIALIAS)
         return resized_image
 
-    def sample(magnitude):
+    def sample(augmentation, magnitude):
         if args.source == "dataloader":
             sampler = TransformSampler(cfg, epochs=0)
-            transforms = sampler.test(magnitude=magnitude)
+            transforms = sampler.augmentation(augmentation=augmentation, magnitude=magnitude)
             train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=transforms[0].get_transforms())
 
             for batch in train_data_loader:
@@ -165,6 +166,8 @@ if __name__ == "__main__":
                 vis = visualizer.draw_dataset_dict(dic)
                 output(vis, os.path.basename(dic["file_name"]))
 
-    for i in range(0,10):
-        sample(magnitude=i)
+    transforms = diffusion_transforms[15:]
+    for t in transforms:
+        for i in range(0,10):
+            sample(t, i)
 

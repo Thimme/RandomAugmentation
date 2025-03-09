@@ -34,7 +34,9 @@ diffusion_transforms = [
     "ControlNetFogAugmentation",
     "ControlNetRainAugmentation",
     "ControlNetSnowAugmentation",
-    "ComfyUIAugmentation"
+    "ControllableSDFogAugmentation",
+    "ControllableSDRainAugmentation",
+    "ControllableSDSnowAugmentation"
 ]
 
 ai_transforms = [
@@ -205,8 +207,6 @@ class TransformSampler():
         aug_class = getattr(sys.modules[__name__], augmentation)
         aug = aug_class(magnitude=magnitude, cfg=self.cfg)
         return [RandomAugmentation(self.cfg, [aug])]
-        augs = [RandomAugmentation(self.cfg, [aug]) for aug in [augmentation]]
-        return augs
     
     def sample_output(self, magnitude=0):
         # amount of images

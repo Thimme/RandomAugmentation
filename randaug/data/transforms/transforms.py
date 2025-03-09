@@ -16,7 +16,7 @@ from torchvision import transforms as v1
 import cv2
 
 MAGNITUDE_BINS = 10 
-DATA_PATH = "/mnt/ssd2/dataset/" 
+DATA_PATH = "/home/rothmeier/Documents/datasets/" 
 
 class Augmentations(Enum):
 
@@ -25,11 +25,12 @@ class Augmentations(Enum):
 
     CYCLE_GAN = 'cyclegan'
     CUT = 'cut'
-    CYCLE_DIFFUSION = 'cyclediffusion'
-    STABLE_DIFFUSION = 'stablediffusion'
-    MGIE_DIFFUSION = 'mgiediffusion'
-    PLUG_DIFFUSION = 'plugdiffusion'
-    CONTROL_DIFFUSION = 'controldiffusion'
+    CYCLE_DIFFUSION = 'cycle_diffusion'
+    STABLE_DIFFUSION = 'stable_diffusion'
+    MGIE_DIFFUSION = 'mgie_diffusion'
+    PLUG_DIFFUSION = 'plugplay_diffusion'
+    CONTROL_DIFFUSION = 'control_diffusion'
+    CONTROLLABLE_SD = 'controllable_sd'
     FOG = 'fog'
     RAIN = 'rain'
     SNOW = 'snow'
@@ -84,13 +85,16 @@ def random_invert(number):
     else:
         return number
 
-def sample_magnitude(magnitude, lower_bound, upper_bound, invert=True, num_bins=10):
+def sample_magnitude(magnitude, lower_bound, upper_bound, invert=True, fixed=False, num_bins=10):
     v = np.linspace(lower_bound, upper_bound, num_bins)
     max_value = v[magnitude]  # upper bound from v based on magnitude
-    value = random.uniform(lower_bound, max_value)
-    if invert:
-        return random_invert(value)
+    
+    if fixed:
+        value = max_value if not invert else random_invert(max_value)
+        return value
     else:
+        value = random.uniform(lower_bound, max_value)
+        value = value if not invert else random_invert(value)
         return value
 
 # Own augmentations
@@ -103,7 +107,7 @@ class FogAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, fixed=self.cfg.magnitude_fixed, invert=False) # type: ignore
         return WeatherTransform(name=str(self.name), severity=int(v))
     
 
@@ -116,7 +120,7 @@ class RainAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, fixed=self.cfg.magnitude_fixed, invert=False)
         return WeatherTransform(name=str(self.name), severity=int(v))
 
 
@@ -129,7 +133,7 @@ class SnowAugmentation(T.Augmentation):
         self.cfg = cfg
 
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, fixed=self.cfg.magnitude_fixed, invert=False)
         return WeatherTransform(name=str(self.name), severity=int(v))
 
 
@@ -150,7 +154,7 @@ class DropAugmentation(T.Augmentation):
             return device
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, fixed=self.cfg.magnitude_fixed, invert=False)
         return WeatherTransform(name=str(self.name), severity=int(v), device=self.device)
     
 
@@ -424,6 +428,48 @@ class ControlNetSnowAugmentation(T.Augmentation):
         return GANTransform(network=self.name, weather=self.weather, severity=self.magnitude, file_path=file_name, cfg=self.cfg)
     
 
+class ControllableSDFogAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CONTROLLABLE_SD
+        self.weather = Augmentations.FOG
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        v = sample_magnitude(self.magnitude, lower_bound=0, upper_bound=9, fixed=self.cfg.magnitude_fixed, invert=False) # type: ignore
+        return ControllableSDTransform(network=self.name, weather=self.weather, severity=int(v), file_path=file_name, cfg=self.cfg)
+    
+
+class ControllableSDRainAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CONTROLLABLE_SD
+        self.weather = Augmentations.RAIN
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        v = sample_magnitude(self.magnitude, lower_bound=0, upper_bound=9, fixed=self.cfg.magnitude_fixed, invert=False) # type: ignore
+        return ControllableSDTransform(network=self.name, weather=self.weather, severity=int(v), file_path=file_name, cfg=self.cfg)
+    
+
+class ControllableSDSnowAugmentation(T.Augmentation):
+
+    def __init__(self, magnitude=1, cfg=None):
+        super().__init__()
+        self.name = Augmentations.CONTROLLABLE_SD
+        self.weather = Augmentations.SNOW
+        self.magnitude = magnitude
+        self.cfg = cfg
+
+    def get_transform(self, image, file_name):
+        v = sample_magnitude(self.magnitude, lower_bound=0, upper_bound=9, fixed=self.cfg.magnitude_fixed, invert=False) # type: ignore
+        return ControllableSDTransform(network=self.name, weather=self.weather, severity=int(v), file_path=file_name, cfg=self.cfg)
+    
+
 class ComfyUIAugmentation(T.Augmentation):
     
     def __init__(self, experiment: str, cfg=None):
@@ -454,7 +500,10 @@ class ShearXAugmentation(T.Augmentation):
     def get_transform(self, image):
         v = np.linspace(3, 30, num=MAGNITUDE_BINS) # Shear in degrees 
         v = random_invert(number=v)
-        transform = A.Affine(shear={"x": (0, v[self.magnitude]), "y": (0, 0)}, p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.Affine(shear={"x": (v[self.magnitude], v[self.magnitude]), "y": (0, 0)}, p=1.0)
+        else:
+            transform = A.Affine(shear={"x": (0, v[self.magnitude]), "y": (0, 0)}, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
@@ -467,10 +516,12 @@ class ShearYAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0, upper_bound=30, invert=True)
         v = np.linspace(3, 30, num=MAGNITUDE_BINS) # Shear in degrees 
         v = random_invert(number=v)
-        transform = A.Affine(shear={"x": (0, 0), "y": (0, v[self.magnitude])}, p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.Affine(shear={"x": (0, 0), "y": (v[self.magnitude], v[self.magnitude])}, p=1.0)
+        else:
+            transform = A.Affine(shear={"x": (0, 0), "y": (0, v[self.magnitude])}, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
@@ -485,7 +536,10 @@ class TranslateXAugmentation(T.Augmentation):
     def get_transform(self, image): 
         v = np.linspace(0.1, 0.45, num=MAGNITUDE_BINS)
         v = random_invert(number=v)
-        transform = A.Affine(translate_percent={"x": (0, v[self.magnitude]), "y": (0, 0)}, p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.Affine(translate_percent={"x": (v[self.magnitude], v[self.magnitude]), "y": (0, 0)}, p=1.0)
+        else:
+            transform = A.Affine(translate_percent={"x": (0, v[self.magnitude]), "y": (0, 0)}, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
@@ -500,7 +554,10 @@ class TranslateYAugmentation(T.Augmentation):
     def get_transform(self, image):
         v = np.linspace(0.1, 0.45, num=MAGNITUDE_BINS)
         v = random_invert(number=v)
-        transform = A.Affine(translate_percent={"x": (0, 0), "y": (0, v[self.magnitude])}, p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.Affine(translate_percent={"x": (0, 0), "y": (v[self.magnitude], v[self.magnitude])}, p=1.0)
+        else:
+            transform = A.Affine(translate_percent={"x": (0, 0), "y": (0, v[self.magnitude])}, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 class RotationAugmentation(T.Augmentation):
@@ -514,7 +571,10 @@ class RotationAugmentation(T.Augmentation):
     def get_transform(self, image):
         angle = np.linspace(3, 30, num=MAGNITUDE_BINS)
         angle = random_invert(number=angle)
-        transform = A.Affine(rotate=(1, angle[self.magnitude]), p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.Affine(rotate=(angle[self.magnitude], angle[self.magnitude]), p=1.0)
+        else:
+            transform = A.Affine(rotate=(1, angle[self.magnitude]), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])  
         
 
@@ -566,7 +626,7 @@ class SolarizeAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=230, upper_bound=0, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=230, upper_bound=0, fixed=self.cfg.magnitude_fixed, invert=False)
         func = lambda x: ImageOps.solarize(x, int(v))
         return T.PILColorTransform(func)
 
@@ -580,7 +640,7 @@ class PosterizeAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=8, upper_bound=1, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=8, upper_bound=1, fixed=self.cfg.magnitude_fixed, invert=False)
         func = lambda x: ImageOps.posterize(x, int(v))
         return T.PILColorTransform(func)
 
@@ -594,7 +654,7 @@ class ContrastAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, invert=True)
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, fixed=self.cfg.magnitude_fixed, invert=True)
         func = lambda x: ImageEnhance.Contrast(x).enhance(1 + v)
         return T.PILColorTransform(func)    
 
@@ -608,7 +668,7 @@ class ColorAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, fixed=self.cfg.magnitude_fixed, invert=False)
         func = lambda x: ImageEnhance.Color(x).enhance(1 - v)
         return T.PILColorTransform(func)
     
@@ -622,7 +682,7 @@ class BrightnessAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, invert=True)
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1, fixed=self.cfg.magnitude_fixed, invert=True)
         func = lambda x: ImageEnhance.Brightness(x).enhance(1 + v)
         return T.PILColorTransform(func)
     
@@ -636,7 +696,7 @@ class SharpnessAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1.0, upper_bound=2.0, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1.0, upper_bound=2.0, fixed=self.cfg.magnitude_fixed, invert=False)
         func = lambda x: ImageEnhance.Sharpness(x).enhance(v)
         return T.PILColorTransform(func)
     
@@ -650,7 +710,7 @@ class CutoutAugmentation(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.CoarseDropout(num_holes_range=(1, int(v)), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
@@ -768,37 +828,72 @@ class WeatherTransform(Transform):
         return segmentation
     
 
-class GANTransform(Transform):
-
-    def __init__(self, network, weather, severity, file_path, cfg):
+class ImageReplaceTransform(Transform):
+    def __init__(self, network, weather, severity, file_path, cfg, base_path):
         super().__init__()
-        self.name = network
+        self.network = network
         self.weather = weather
         self.severity = severity
         self.file_path = file_path
         self.cfg = cfg
-        self.image = self._read_image(self.file_path)
+        self.base_path = base_path
+        self.image = self._read_image()
         self.original: np.ndarray
 
-    def _read_image(self, file_path: str):
-        filename = file_path.split('/')[-1]
+    def _read_image(self):
+        filename = os.path.basename(self.file_path)
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
-        # path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.weather), filename_jpg)
+        
+        path = os.path.join(self.base_path, str(self.network), '0', str(self.weather), filename_jpg)
 
         if not os.path.isfile(path):
             path = f'{path[:-4]}.png'
+
         return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
-    
+
     def apply_image(self, img: np.ndarray):
         self.original = img
         return self.image
-        
+
     def apply_coords(self, coords):
         return coords
-    
+
     def apply_segmentation(self, segmentation):
         return segmentation
+
+# Now specialize this class:
+
+class GANTransform(ImageReplaceTransform):
+    def __init__(self, network, weather, severity, file_path, cfg):
+        base_path = f'{DATA_PATH}/cvpr24/adverse/augmentation'
+        # or: base_path = f'{DATA_PATH}/cvpr24/adverse/itsc_augmentation'
+        super().__init__(network, weather, severity, file_path, cfg, base_path)
+
+class ControllableSDTransform(ImageReplaceTransform):
+    def __init__(self, network, weather, severity, file_path, cfg):
+        base_path = f'{DATA_PATH}/pami_train'
+        super().__init__(network, weather, severity, file_path, cfg, base_path)
+
+    def _read_image(self):
+        filename = os.path.basename(self.file_path)
+        filename_jpg = f'{filename[:-4]}.jpg'
+        experiments = self.get_experiments()
+        experiments.reverse()
+
+        print(self.severity)
+        path = os.path.join(self.base_path, f'experiment_{experiments[self.severity]}_{self.weather}', filename_jpg)
+
+        if not os.path.isfile(path):
+            path = f'{path[:-4]}.png'
+
+        return utils.read_image(path, format=self.cfg.INPUT.FORMAT)
+    
+    def get_experiments(self):
+        experiments = ['024', '030', '031', '032', '033', '034', '035', '036', '037', '038']
+        if self.weather == Augmentations.FOG:
+            experiments = ['039', '040', '041', '042', '043', '044', '045', '046', '047', '048']
+        return experiments
+    
     
 class ComfyUITransform(Transform):
 
@@ -881,13 +976,13 @@ class MGIETransform(Transform):
         self.severity = severity
         self.file_path = file_path
         self.cfg = cfg
-        self.image = self._read_image2(self.file_path)
+        self.image = self._read_image(self.file_path)
         self.original: np.ndarray
     
     def _read_image(self, file_path: str):
         filename = file_path.split('/')[-1]
         filename_jpg = f'{filename[:-4]}.jpg'
-        path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/augmentation', str(self.name), str(self.weather), filename_jpg)
+        path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/augmentation', str(self.name), '0', str(self.weather), filename_jpg)
         # path = os.path.join(f'{DATA_PATH}/cvpr24/adverse/itsc_augmentation', str(self.name), str(self.severity), str(self.weather), filename_jpg)
     
         if not os.path.isfile(path):
@@ -896,7 +991,7 @@ class MGIETransform(Transform):
     
     def _read_image2(self, file_path: str):
         filename = file_path.split('/')[-1]
-        prefix = self.random_weather_prefix()
+        prefix = "" # self.random_weather_prefix()
         filename_jpg = f'{prefix}{filename[:-4]}.jpg'
         path = os.path.join(f'{DATA_PATH}/pami_train', str(self.name), filename_jpg)
 
@@ -991,9 +1086,14 @@ class AdditiveNoise(T.Augmentation):
         
     def get_transform(self, image):
         std = np.linspace(0.1, 0.5, MAGNITUDE_BINS)
-        transform = A.AdditiveNoise(noise_type="gaussian", spatial_mode="shared", 
-                                    noise_params={"mean_range": (0.0, 0.0), "std_range": (0.05, std[self.magnitude])}, 
+        if self.cfg.magnitude_fixed:
+            transform = A.AdditiveNoise(noise_type="gaussian", spatial_mode="shared", 
+                                    noise_params={"mean_range": (0.0, 0.0), "std_range": (std[self.magnitude], std[self.magnitude])}, 
                                     p=1.0)
+        else:
+            transform = A.AdditiveNoise(noise_type="gaussian", spatial_mode="shared", 
+                                        noise_params={"mean_range": (0.0, 0.0), "std_range": (0.05, std[self.magnitude])}, 
+                                        p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
     
 class ChannelShuffle(T.Augmentation):
@@ -1018,9 +1118,14 @@ class ChromaticAberration(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.05, 5, MAGNITUDE_BINS)
-        transform = A.ChromaticAberration(primary_distortion_limit=(0.0, v[self.magnitude]), 
-                                          secondary_distortion_limit=(-0.05, 0.05), mode='random', 
-                                          interpolation=cv2.INTER_LINEAR, p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.ChromaticAberration(primary_distortion_limit=(v[self.magnitude], v[self.magnitude]), 
+                                              secondary_distortion_limit=(-0.05, 0.05), mode='random', 
+                                              interpolation=cv2.INTER_LINEAR, p=1.0)
+        else:
+            transform = A.ChromaticAberration(primary_distortion_limit=(0.0, v[self.magnitude]), 
+                                              secondary_distortion_limit=(-0.05, 0.05), mode='random', 
+                                              interpolation=cv2.INTER_LINEAR, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 class ColorJitter(T.Augmentation):
@@ -1033,8 +1138,15 @@ class ColorJitter(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1, MAGNITUDE_BINS)
-        transform = A.ColorJitter(brightness=v[self.magnitude], contrast=v[self.magnitude], 
-                                  saturation=v[self.magnitude], p=1.0)
+        if self.cfg.magnitude_fixed:
+            v = random_invert(number=v)
+            transform = A.ColorJitter(brightness=(1 + v[self.magnitude], 1 + v[self.magnitude]),
+                                      contrast=(1 + v[self.magnitude], 1 + v[self.magnitude]), 
+                                      saturation=(1 + v[self.magnitude], 1 + v[self.magnitude]), p=1.0)
+        else:
+            transform = A.ColorJitter(brightness=v[self.magnitude], 
+                                      contrast=v[self.magnitude], 
+                                      saturation=v[self.magnitude], p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 class Emboss(T.Augmentation):
@@ -1047,7 +1159,10 @@ class Emboss(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1, MAGNITUDE_BINS)
-        transform = A.Emboss(alpha=(v[self.magnitude], 1.0), strength=(v[self.magnitude], 1.0), p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.Emboss(alpha=(v[self.magnitude], v[self.magnitude]), strength=(v[self.magnitude], v[self.magnitude]), p=1.0)
+        else:
+            transform = A.Emboss(alpha=(0.05, v[self.magnitude]), strength=(0.05, v[self.magnitude]), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
     
 class HueSaturationValue(T.Augmentation):
@@ -1060,7 +1175,13 @@ class HueSaturationValue(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(10, 100, MAGNITUDE_BINS)
-        transform = A.HueSaturationValue(hue_shift_limit=v[self.magnitude], 
+        if self.cfg.magnitude_fixed:
+            v = random_invert(number=v)
+            transform = A.HueSaturationValue(hue_shift_limit=(v[self.magnitude], v[self.magnitude]), 
+                                             sat_shift_limit=(v[self.magnitude], v[self.magnitude]), 
+                                             val_shift_limit=(v[self.magnitude], v[self.magnitude]), p=1.0)
+        else:
+            transform = A.HueSaturationValue(hue_shift_limit=v[self.magnitude], 
                                          sat_shift_limit=v[self.magnitude], 
                                          val_shift_limit=v[self.magnitude], p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
@@ -1075,7 +1196,10 @@ class IsoNoise(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.0, MAGNITUDE_BINS)
-        transform = A.ISONoise(color_shift=(0.01, 1), intensity=(0.1, v[self.magnitude]), p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.ISONoise(color_shift=(0.01, 1), intensity=(v[self.magnitude], v[self.magnitude]), p=1.0)
+        else:
+            transform = A.ISONoise(color_shift=(0.01, 1), intensity=(0.1, v[self.magnitude]), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
     
 # checkpoint
@@ -1089,7 +1213,7 @@ class PixelDropout(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=0.9, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=0.9, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.PixelDropout(dropout_prob=v, per_channel=True, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
     
@@ -1104,8 +1228,15 @@ class PlasmaBrightnessContrast(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.0, MAGNITUDE_BINS)
-        transform = A.PlasmaBrightnessContrast(brightness_range=(-v[self.magnitude], v[self.magnitude]), 
-                                               contrast_range=(-v[self.magnitude], v[self.magnitude]), roughness=5, p=1.0)
+        if self.cfg.magnitude_fixed:
+            v = random_invert(number=v)
+            transform = A.PlasmaBrightnessContrast(brightness_range=(v[self.magnitude], v[self.magnitude]), 
+                                                   contrast_range=(v[self.magnitude], v[self.magnitude]), 
+                                                   roughness=5, p=1.0)
+        else:
+            transform = A.PlasmaBrightnessContrast(brightness_range=(-v[self.magnitude], v[self.magnitude]), 
+                                                   contrast_range=(-v[self.magnitude], v[self.magnitude]), 
+                                                   roughness=5, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
     
 
@@ -1119,7 +1250,10 @@ class RandomFog(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1.0, MAGNITUDE_BINS)
-        transform = A.RandomFog(alpha_coef=0.08, fog_coef_range=(0.05, v[self.magnitude]), p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.RandomFog(alpha_coef=0.08, fog_coef_range=(v[self.magnitude], v[self.magnitude]), p=1.0)
+        else:
+            transform = A.RandomFog(alpha_coef=0.08, fog_coef_range=(0.05, v[self.magnitude]), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
@@ -1132,7 +1266,7 @@ class RandomGamma(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=10, upper_bound=100, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=10, upper_bound=100, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.RandomGamma(gamma_limit=(80 + v, 120), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
     
@@ -1146,7 +1280,7 @@ class RandomGravel(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=5, upper_bound=50, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=5, upper_bound=50, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.RandomGravel(gravel_roi=(0.0, 0.0, 1.0, 1.0), number_of_patches=int(v), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
@@ -1160,7 +1294,7 @@ class RandomRain(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1, upper_bound=10, fixed=self.cfg.magnitude_fixed, invert=False)
         rain_type = 'default'
         if v <= 2:
             rain_type = 'drizzle'
@@ -1185,7 +1319,10 @@ class RandomSnow(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(0.1, 1, MAGNITUDE_BINS)
-        transform = A.RandomSnow(snow_point_range=(v[self.magnitude], 1.0), p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.RandomSnow(snow_point_range=(v[self.magnitude], v[self.magnitude]), p=1.0)
+        else:
+            transform = A.RandomSnow(snow_point_range=(v[self.magnitude], 1.0), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
 
@@ -1198,7 +1335,7 @@ class SaltAndPepper(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.01, upper_bound=0.25, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=0.01, upper_bound=0.25, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.SaltAndPepper(amount=(0.01, v), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
@@ -1212,7 +1349,7 @@ class ShotNoise(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.05, upper_bound=0.5, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=0.05, upper_bound=0.5, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.ShotNoise(scale_range=(0.01, v), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
@@ -1226,7 +1363,7 @@ class GlassBlur(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1.0, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=0.1, upper_bound=1.0, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.GlassBlur(sigma=v, p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
@@ -1241,8 +1378,12 @@ class MotionBlur(T.Augmentation):
         
     def get_transform(self, image):
         v = np.linspace(5, 25, MAGNITUDE_BINS)
-        transform = A.MotionBlur(blur_limit=(3, int(v[self.magnitude])), p=1.0)
+        if self.cfg.magnitude_fixed:
+            transform = A.MotionBlur(blur_limit=(int(v[self.magnitude]), int(v[self.magnitude])), p=1.0)
+        else:
+            transform = A.MotionBlur(blur_limit=(3, int(v[self.magnitude])), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
+
 
 
 class ZoomBlur(T.Augmentation):
@@ -1254,7 +1395,7 @@ class ZoomBlur(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=1.03, upper_bound=1.3, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=1.03, upper_bound=1.3, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.ZoomBlur(max_factor=(1, v), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
@@ -1268,7 +1409,7 @@ class Defocus(T.Augmentation):
         self.cfg = cfg
         
     def get_transform(self, image):
-        v = sample_magnitude(self.magnitude, lower_bound=5, upper_bound=15, invert=False)
+        v = sample_magnitude(self.magnitude, lower_bound=5, upper_bound=15, fixed=self.cfg.magnitude_fixed, invert=False)
         transform = A.Defocus(radius=(3, int(v)), p=1.0)
         return AlbumentationsTransform(transform, size=image.shape[:2])
 
