@@ -120,7 +120,7 @@ def custom_setup_cyclegan_cut(cfg):
 
 def experiment(args):
     setup_funcs = [setup_detr, setup_frcnn, setup_retinanet]
-    transforms = image_transforms + geometric_transforms + weather_transforms + dropout_transforms
+    transforms = geometric_transforms + weather_transforms + dropout_transforms
     magnitudes = [3, 6, 9]
 
     for _ in range(args.iterations):
