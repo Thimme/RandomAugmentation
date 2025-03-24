@@ -880,7 +880,6 @@ class ControllableSDTransform(ImageReplaceTransform):
         experiments = self.get_experiments()
         experiments.reverse()
 
-        print(self.severity)
         path = os.path.join(self.base_path, f'experiment_{experiments[self.severity]}_{self.weather}', filename_jpg)
 
         if not os.path.isfile(path):

@@ -113,8 +113,6 @@ class RandAugmentDatasetMapper(DatasetMapper):
         self.keypoint_hflip_indices = keypoint_hflip_indices
         self.proposal_topk          = precomputed_proposal_topk
         self.recompute_boxes        = recompute_boxes
-        self.N                      = N
-        self.M                      = M
         self.sampler                = sampler
         # fmt: on
         logger = logging.getLogger(__name__)
@@ -127,9 +125,7 @@ class RandAugmentDatasetMapper(DatasetMapper):
             "image_format": cfg.INPUT.FORMAT,
             "use_instance_mask": cfg.MODEL.MASK_ON,
             "instance_mask_format": cfg.INPUT.MASK_FORMAT,
-            "use_keypoint": cfg.MODEL.KEYPOINT_ON,
-            "N": cfg.rand_N,
-            "M": cfg.rand_M
+            "use_keypoint": cfg.MODEL.KEYPOINT_ON
         }
 
         if cfg.MODEL.KEYPOINT_ON:
@@ -162,7 +158,9 @@ class RandAugmentDatasetMapper(DatasetMapper):
         else:
             sem_seg_gt = None
         
-        augmentations = T.AugmentationList(self.sampler.random_augmentation(self.N, self.M))
+        augs = self.sampler.adverse_augmentation()
+        print(augs)
+        augmentations = T.AugmentationList(augs)
         #print(augmentations)
         aug_input = MyAugInput(image, sem_seg=sem_seg_gt, file_name=dataset_dict["file_name"])
         transforms = augmentations(aug_input)

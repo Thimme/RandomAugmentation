@@ -53,10 +53,8 @@ class RandTrainer(TrainerBase):
 
         if augmentation == None:
             data_loader = self.build_rand_augment_train_loader(cfg)
-            self.rand_aug = f"{cfg.rand_N}-{cfg.rand_M}"
         else:
             data_loader = self.build_train_loader(cfg, augmentation.get_transforms())
-            self.rand_aug = augmentation
 
         model = create_ddp_model(model, broadcast_buffers=False)
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
@@ -345,6 +343,7 @@ class RandTrainer(TrainerBase):
                 results_a["frozen"] = cfg.frozen_backbone
                 results_a["iterations"] = iteration + 1
                 results_a["magnitude"] = cfg.magnitude
+                results_a["magnitude_fixed"] = cfg.magnitude_fixed
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:
