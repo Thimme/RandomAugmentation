@@ -229,74 +229,143 @@ class RandomSampler():
         self.cfg = cfg
         self.device = device
         self.probability = cfg.aug_prob
+        self.iterations = 0
+    
+    def adverse_augmentation(self):
+        # magnitude 
+        # progressive training
+        # use deep augmentation
+        # use traditional augmentation
+        # use adverse overlay
+        # define augmentation set
+        magnitude = self.get_magnitude()
+        use_deep = self.cfg.use_deep
+        use_overlay = self.cfg.use_overlay
+        use_standard = self.cfg.use_standard
+        transforms = self.build_augmentation_stack(deep=use_deep, overlay=use_overlay, standard=use_standard, magnitude=magnitude)
+        self.update_iterations()
+        return transforms
+    
+    def build_augmentation_stack(self, deep=True, overlay=True, standard=True, magnitude=0):
+        # build augmentation stack, sample from deep, sample from overlays, sample from traditional
+        deep_augmentations = self.deep_augmentations(magnitude=magnitude, use_deep=deep)
+        overlay_augmentations = self.overlay_augmentations(magnitude=magnitude, use_overlay=overlay)
+        standard_augmentations = self.standard_augmentation(magnitude=magnitude, use_standard=standard)
+        post_processing = self.postprocessing_augmentations()
 
-    def _sample_ops(self, N):
-        transforms = ai_transforms + image_transforms
-        one_time = ai_transforms # ["DropAugmentation"]
+        return deep_augmentations + overlay_augmentations + standard_augmentations + post_processing
+    
+    def deep_augmentations(self, magnitude=0, use_deep=True):
+        if not use_deep:
+            return []
+        transforms = diffusion_transforms + gan_transforms
+        return self._sample(transforms, magnitude)
+    
+    def overlay_augmentations(self, magnitude=0, use_overlay=True):
+        if not use_overlay:
+            return []
+        transforms = weather_transforms
+        return self._sample(transforms, magnitude)
+    
+    def standard_augmentation(self, magnitude=0, use_standard=True):
+        if not use_standard:
+            return []
+        transforms = image_transforms + dropout_transforms + geometric_transforms
+        return self._sample(transforms, magnitude)
+    
+    def postprocessing_augmentations(self):
+        transforms = []
+        transforms.append(T.RandomFlip(prob=0.5))
+        if self.cfg.cutout_postprocessing:
+            transforms.append(CutoutAugmentation(cfg=self.cfg))
+        if self.cfg.box_postprocessing:
+            transforms.append(BoundingboxAugmentation(algorithm='dino'))
+        
+        return transforms
 
-        while True:
-            # Sample elements from A
-            sampled = np.random.choice(transforms, N) # type: ignore
-            # Count how many elements are in B
-            gan_count = sum(element in one_time for element in sampled)
-
-            # It does not make sense to have more than one gan / diffusion transform as it replaces the rest of the augmentations
-            if gan_count <= 1:
-                sampled = [self._replace_sample(s) for s in sampled]
-                return sampled
-            
-    # This is implemented to reduce the amount of sampling for ai based augmentations
-    # 
-    def _replace_sample(self, sample):
-        if sample in ai_transforms:
-            while True:
-                condition = random.choice(ai_conditions)
-                aug = f"{sample}{condition}"
-                if aug in diffusion_transforms + gan_transforms:
-                    return aug 
+    def update_iterations(self):
+        self.iterations += (1 / 2.0) # num gpus
+    
+    def get_magnitude(self):
+        if self.cfg.progressive:
+            return min(math.floor((self.iterations / self.cfg.SOLVER.MAX_ITER) * self.cfg.magnitude), self.cfg.magnitude)
         else:
-            return sample
+            return self.cfg.magnitude
+        
+    def _sample(self, transforms, magnitude):
+        aug = random.sample(transforms, 1)[0]
+        aug_class = getattr(sys.modules[__name__], aug)
+        aug = self._init_transform(aug_class, magnitude)
+        return [aug]
     
-    def _add_magnitude(self, ops, M):
-        magnitude = M
-        return [(o, magnitude) for o in ops]
-    
-    def _map_to_transforms(self, ops):
-        transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
-        transforms = [self._init_transform(t, op[1]) for t, op in zip(transforms, ops)]
-        magnitudes = [op[1] for op in ops]
-        return transforms, magnitudes
-    
-    # Random sampling causes the drop augmentation not to distribute across devices so this function is needed
+     # Random sampling causes the drop augmentation not to distribute across devices so this function is needed
     def _init_transform(self, transform, magnitude) -> T.Augmentation:
         if transform == DropAugmentation:
             return transform(magnitude, cfg=self.cfg, device=self.device)
         else:
             return transform(magnitude, cfg=self.cfg)
     
-    def _reorder_ops(self, ops, list):
-        # Convert B to a set for faster lookup
-        list_set = set(list)
-        # Filter elements from A that are in B
-        in_list = np.array([item for item in ops if item in list_set])
-        # Filter elements from A that are not in B
-        not_in_list = np.array([item for item in ops if item not in list_set])
-        # Concatenate the arrays to get the desired order
-        return np.concatenate((in_list, not_in_list))
+    # # old code
+    # def _reorder_ops(self, ops, list):
+    #     # Convert B to a set for faster lookup
+    #     list_set = set(list)
+    #     # Filter elements from A that are in B
+    #     in_list = np.array([item for item in ops if item in list_set])
+    #     # Filter elements from A that are not in B
+    #     not_in_list = np.array([item for item in ops if item not in list_set])
+    #     # Concatenate the arrays to get the desired order
+    #     return np.concatenate((in_list, not_in_list))
 
-    def random_augmentation(self, N, M):
-        if random.uniform(0, 1) > self.probability:
-            return [NoOpTransform()]
-        ops = self._sample_ops(N)
-        ops = self._reorder_ops(ops, gan_transforms + diffusion_transforms)
-        ops = self._add_magnitude(ops, M)
-        transforms, _ = self._map_to_transforms(ops)
-        transforms.append(T.RandomFlip(prob=0.5))
+    # def random_augmentation(self, N, M):
+    #     if random.uniform(0, 1) > self.probability:
+    #         return [NoOpTransform()]
+    #     ops = self._sample_ops(N)
+    #     ops = self._reorder_ops(ops, gan_transforms + diffusion_transforms)
+    #     ops = self._add_magnitude(ops, M)
+    #     transforms, _ = self._map_to_transforms(ops)
+    #     transforms.append(T.RandomFlip(prob=0.5))
 
-        if self.cfg.box_postprocessing == True:
-            transforms.append(BoundingboxAugmentation(algorithm='dino'))
+    #     if self.cfg.box_postprocessing == True:
+    #         transforms.append(BoundingboxAugmentation(algorithm='dino'))
 
-        if self.cfg.save_image == True:
-            transforms.append(BoundingboxAugmentation(algorithm='generate_samples', cfg=self.cfg))
+    #     if self.cfg.save_image == True:
+    #         transforms.append(BoundingboxAugmentation(algorithm='generate_samples', cfg=self.cfg))
 
-        return transforms
+    #     return transforms
+    
+    # def _sample_ops(self, N):
+    #     transforms = ai_transforms + image_transforms
+    #     one_time = ai_transforms # ["DropAugmentation"]
+
+    #     while True:
+    #         # Sample elements from A
+    #         sampled = np.random.choice(transforms, N) # type: ignore
+    #         # Count how many elements are in B
+    #         gan_count = sum(element in one_time for element in sampled)
+
+    #         # It does not make sense to have more than one gan / diffusion transform as it replaces the rest of the augmentations
+    #         if gan_count <= 1:
+    #             sampled = [self._replace_sample(s) for s in sampled]
+    #             return sampled
+            
+    # # This is implemented to reduce the amount of sampling for ai based augmentations
+    # # 
+    # def _replace_sample(self, sample):
+    #     if sample in ai_transforms:
+    #         while True:
+    #             condition = random.choice(ai_conditions)
+    #             aug = f"{sample}{condition}"
+    #             if aug in diffusion_transforms + gan_transforms:
+    #                 return aug 
+    #     else:
+    #         return sample
+    
+    # def _add_magnitude(self, ops, M):
+    #     magnitude = M
+    #     return [(o, magnitude) for o in ops]
+    
+    # def _map_to_transforms(self, ops):
+    #     transforms = [getattr(sys.modules[__name__], op[0]) for op in ops]
+    #     transforms = [self._init_transform(t, op[1]) for t, op in zip(transforms, ops)]
+    #     magnitudes = [op[1] for op in ops]
+    #     return transforms, magnitudes

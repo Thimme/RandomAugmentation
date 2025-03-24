@@ -53,10 +53,8 @@ class RandTrainer(TrainerBase):
 
         if augmentation == None:
             data_loader = self.build_rand_augment_train_loader(cfg)
-            self.rand_aug = f"{cfg.rand_N}-{cfg.rand_M}"
         else:
             data_loader = self.build_train_loader(cfg, augmentation.get_transforms())
-            self.rand_aug = augmentation
 
         model = create_ddp_model(model, broadcast_buffers=False)
         self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
