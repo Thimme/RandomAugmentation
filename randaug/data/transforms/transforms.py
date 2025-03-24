@@ -16,7 +16,7 @@ from torchvision import transforms as v1
 import cv2
 
 MAGNITUDE_BINS = 10 
-DATA_PATH = "/home/rothmeier/Documents/datasets/" 
+DATA_PATH = "/mnt/ssd2/dataset/" 
 
 class Augmentations(Enum):
 
@@ -880,7 +880,6 @@ class ControllableSDTransform(ImageReplaceTransform):
         experiments = self.get_experiments()
         experiments.reverse()
 
-        print(self.severity)
         path = os.path.join(self.base_path, f'experiment_{experiments[self.severity]}_{self.weather}', filename_jpg)
 
         if not os.path.isfile(path):

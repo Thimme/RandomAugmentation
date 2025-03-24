@@ -19,21 +19,21 @@ gan_transforms = [
 ]
 
 diffusion_transforms = [
-    "StableDiffusionFogAugmentation",
-    "StableDiffusionRainAugmentation",
-    "StableDiffusionSnowAugmentation",
-    "CycleDiffusionFogAugmentation",
-    "CycleDiffusionRainAugmentation",
-    "CycleDiffusionSnowAugmentation",
-    "MGIEDiffusionFogAugmentation",
-    "MGIEDiffusionRainAugmentation",
-    "MGIEDiffusionSnowAugmentation",
-    "PlugPlayFogAugmentation",
-    "PlugPlayRainAugmentation",
-    "PlugPlaySnowAugmentation",
-    "ControlNetFogAugmentation",
-    "ControlNetRainAugmentation",
-    "ControlNetSnowAugmentation",
+    # "StableDiffusionFogAugmentation",
+    # "StableDiffusionRainAugmentation",
+    # "StableDiffusionSnowAugmentation",
+    # "CycleDiffusionFogAugmentation",
+    # "CycleDiffusionRainAugmentation",
+    # "CycleDiffusionSnowAugmentation",
+    # "MGIEDiffusionFogAugmentation",
+    # "MGIEDiffusionRainAugmentation",
+    # "MGIEDiffusionSnowAugmentation",
+    # "PlugPlayFogAugmentation",
+    # "PlugPlayRainAugmentation",
+    # "PlugPlaySnowAugmentation",
+    # "ControlNetFogAugmentation",
+    # "ControlNetRainAugmentation",
+    # "ControlNetSnowAugmentation",
     "ControllableSDFogAugmentation",
     "ControllableSDRainAugmentation",
     "ControllableSDSnowAugmentation"
@@ -189,7 +189,7 @@ class TransformSampler():
     def test(self, magnitude=0):
         #return [RandomAugmentation(self.cfg, 1, [])]
         #return [RandomAugmentation(self.cfg, 1, [CycleGANFogAugmentation(magnitude=1, cfg=self.cfg), ShearXAugmentation(magnitude=1, cfg=self.cfg), SnowAugmentation(magnitude=2, cfg=self.cfg)])]
-        return [RandomAugmentation(self.cfg, [DropAugmentation(magnitude=magnitude, cfg=self.cfg)])]
+        return [RandomAugmentation(self.cfg, [MGIEDiffusionRainAugmentation(magnitude=magnitude, cfg=self.cfg), DropAugmentation(magnitude=magnitude, cfg=self.cfg)])]
         #return [RandomAugmentation(self.cfg, 1, [ComfyUIAugmentation(experiment="experiment_032_rain", cfg=self.cfg), RainAugmentation(magnitude=4, cfg=self.cfg)])]
     
     def diffusion_search(self):

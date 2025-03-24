@@ -345,6 +345,7 @@ class RandTrainer(TrainerBase):
                 results_a["frozen"] = cfg.frozen_backbone
                 results_a["iterations"] = iteration + 1
                 results_a["magnitude"] = cfg.magnitude
+                results_a["magnitude_fixed"] = cfg.magnitude_fixed
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:

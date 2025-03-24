@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) Facebook, Inc. and its affiliates.
 import sys
-sys.path.append("/home/rothmeier/Documents/github/RandomAugmentation") # bad code
+sys.path.append("/home/rothmeier/Documents/projects/RandomAugmentation") # bad code
 
 import argparse
 import os
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     def sample(augmentation, magnitude):
         if args.source == "dataloader":
             sampler = TransformSampler(cfg, epochs=0)
-            transforms = sampler.augmentation(augmentation=augmentation, magnitude=magnitude)
+            transforms = sampler.test(magnitude=magnitude)
             train_data_loader = RandTrainer.build_train_loader(cfg=cfg, transforms=transforms[0].get_transforms())
 
             for batch in train_data_loader:
@@ -141,8 +141,8 @@ if __name__ == "__main__":
                     img = utils.convert_image_to_rgb(img, cfg.INPUT.FORMAT)
                     file_id = per_image['image_id']
                     img = Image.fromarray(img)
-                    #img.save(os.path.join(dirname, file_id + '.jpg'))
-                    #break
+                    img.save(os.path.join(dirname, f"{magnitude}_{file_id}.jpg"))
+                    break
                     vis = visualize_image(img, per_image["instances"])
 
                     if args.concat:
@@ -154,8 +154,6 @@ if __name__ == "__main__":
                         concat_image.save(os.path.join(dirname, file_id + '.jpg'))
                     else:
                         output(vis, f"{magnitude}_{file_id}.jpg")
-                    break
-                break
         else:
             dicts = list(chain.from_iterable([DatasetCatalog.get(k) for k in cfg.DATASETS.TRAIN]))
             if cfg.MODEL.KEYPOINT_ON:
@@ -166,8 +164,7 @@ if __name__ == "__main__":
                 vis = visualizer.draw_dataset_dict(dic)
                 output(vis, os.path.basename(dic["file_name"]))
 
-    transforms = diffusion_transforms[15:]
+    transforms = gan_transforms + diffusion_transforms
     for t in transforms:
         for i in range(0,10):
             sample(t, i)
-

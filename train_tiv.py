@@ -1,7 +1,7 @@
 from detectron2.config import get_cfg
 from detectron2.engine import default_argument_parser, default_setup, launch
 from randaug.engine import RandTrainer
-from randaug.engine.transform_sampler import TransformSampler, dropout_transforms, image_transforms, weather_transforms, geometric_transforms
+from randaug.engine.transform_sampler import TransformSampler, dropout_transforms, image_transforms, weather_transforms, geometric_transforms, diffusion_transforms, gan_transforms
 from randaug.data import datasets
 from randaug.models.detr import add_detr_config
 from detectron2.checkpoint import DetectionCheckpointer
@@ -120,9 +120,9 @@ def custom_setup_cyclegan_cut(cfg):
     return cfg
 
 def experiment(args):
-    setup_funcs = [setup_detr, setup_frcnn, setup_retinanet]
-    transforms = geometric_transforms + weather_transforms + dropout_transforms
-    magnitudes = [3, 6, 9]
+    setup_funcs = [setup_detr, setup_retinanet]
+    transforms = diffusion_transforms
+    magnitudes = [6, 9]
 
     for _ in range(args.iterations):
         for setup_func, aug, magnitude in product(setup_funcs, transforms, magnitudes):

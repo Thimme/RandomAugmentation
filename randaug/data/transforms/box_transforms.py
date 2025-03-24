@@ -34,6 +34,9 @@ frcnn = DefaultPredictor(cfg)
 
 # Bounding box transforms
 
+def is_invalid_bbox(box: np.ndarray) -> bool:
+    return bool(np.all(np.isinf(box)))  # Explicit conversion to Python bool
+
 def PSNR(original, compressed): 
     mse = np.mean((original - compressed) ** 2) 
     if(mse == 0):  # MSE is zero means no noise is present in the signal . 
@@ -171,6 +174,8 @@ class CLIPBBTransform(Transform):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
+        if is_invalid_bbox(box):
+            return box
         try:
             if self._predict(self.image, box) < self.threshold:
                 #print('removeu')
@@ -211,6 +216,8 @@ class DINOBBTransform(Transform):
         return img
     
     def apply_box(self, box: np.ndarray) -> np.ndarray:
+        if is_invalid_bbox(box):
+            return box
         try:
             if self._predict(self.image, box) < self.threshold:
                 return self._invalidate_bbox()
