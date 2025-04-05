@@ -9,55 +9,122 @@ from fvcore.transforms.transform import NoOpTransform
 
 from itertools import product
 
+# gan_transforms = [
+#     "CycleGANFogAugmentation",
+#     "CycleGANRainAugmentation",
+#     "CycleGANSnowAugmentation",
+#     "CUTFogAugmentation",
+#     "CUTRainAugmentation",
+#     "CUTSnowAugmentation",
+# ]
+
+# diffusion_transforms = [
+#     "StableDiffusionFogAugmentation",
+#     "StableDiffusionRainAugmentation",
+#     "StableDiffusionSnowAugmentation",
+#     "CycleDiffusionFogAugmentation",
+#     "CycleDiffusionRainAugmentation",
+#     "CycleDiffusionSnowAugmentation",
+#     "MGIEDiffusionFogAugmentation",
+#     "MGIEDiffusionRainAugmentation",
+#     "MGIEDiffusionSnowAugmentation",
+#     "PlugPlayFogAugmentation",
+#     "PlugPlayRainAugmentation",
+#     "PlugPlaySnowAugmentation",
+#     "ControlNetFogAugmentation",
+#     "ControlNetRainAugmentation",
+#     "ControlNetSnowAugmentation",
+#     "ControllableSDFogAugmentation",
+#     "ControllableSDRainAugmentation",
+#     "ControllableSDSnowAugmentation"
+# ]
+
+# ai_transforms = [
+#     "CycleGAN",
+#     "CUT",
+#     "StableDiffusion",
+#     "CycleDiffusion",
+#     "MGIEDiffusion",
+# ]
+
+# ai_conditions = [
+#     "FogAugmentation",
+#     "RainAugmentation",
+#     "SnowAugmentation",
+# ]
+
+# image_transforms = [
+#     "ColorAugmentation",
+#     "AutoContrastAugmentation",
+#     "InvertAugmentation",
+#     "EqualizeAugmentation",
+#     "SolarizeAugmentation",
+#     "PosterizeAugmentation",
+#     "ContrastAugmentation",
+#     "BrightnessAugmentation",
+#     "SharpnessAugmentation",
+#     "Defocus",
+#     "ZoomBlur",
+#     "MotionBlur",
+#     "GlassBlur",
+#     "ShotNoise",
+#     "SaltAndPepper",
+#     "RandomSnow",
+#     "RandomRain",
+#     "RandomGravel", 
+#     "RandomGamma",
+#     "RandomFog",
+#     "PlasmaBrightnessContrast",
+#     "IsoNoise",
+#     "HueSaturationValue",
+#     "Emboss",
+#     "ColorJitter",
+#     "ChromaticAberration",
+#     "ChannelShuffle",
+#     "AdditiveNoise"
+# ]
+
+# dropout_transforms = ["CutoutAugmentation", "ChannelDropout", "PixelDropout"]
+# weather_transforms = [ "FogAugmentation", "SnowAugmentation", "RainAugmentation", "DropAugmentation"]
+# autoaugment_transforms = ["AutoAugmentAugmentation", "RandAugmentAugmentation", "TrivialWideAugmentation", "AugMixAugmentation"]
+# geometric_transforms = ["ShearXAugmentation", "ShearYAugmentation", "TranslateXAugmentation", "TranslateYAugmentation", "RotationAugmentation"]
+
+
 gan_transforms = [
     "CycleGANFogAugmentation",
-    "CycleGANRainAugmentation",
-    "CycleGANSnowAugmentation",
-    "CUTFogAugmentation",
-    "CUTRainAugmentation",
+    #"CycleGANRainAugmentation",
+    #"CycleGANSnowAugmentation",
+    #"CUTFogAugmentation",
+    #"CUTRainAugmentation",
     "CUTSnowAugmentation",
 ]
 
 diffusion_transforms = [
-    # "StableDiffusionFogAugmentation",
-    # "StableDiffusionRainAugmentation",
-    # "StableDiffusionSnowAugmentation",
-    # "CycleDiffusionFogAugmentation",
-    # "CycleDiffusionRainAugmentation",
-    # "CycleDiffusionSnowAugmentation",
-    # "MGIEDiffusionFogAugmentation",
-    # "MGIEDiffusionRainAugmentation",
-    # "MGIEDiffusionSnowAugmentation",
-    # "PlugPlayFogAugmentation",
-    # "PlugPlayRainAugmentation",
-    # "PlugPlaySnowAugmentation",
-    # "ControlNetFogAugmentation",
-    # "ControlNetRainAugmentation",
-    # "ControlNetSnowAugmentation",
+    #"StableDiffusionFogAugmentation",
+    #"StableDiffusionRainAugmentation",
+    #"StableDiffusionSnowAugmentation",
+    #"CycleDiffusionFogAugmentation",
+    #"CycleDiffusionRainAugmentation",
+    #"CycleDiffusionSnowAugmentation",
+    #"MGIEDiffusionFogAugmentation",
+    #"MGIEDiffusionRainAugmentation",
+    #"MGIEDiffusionSnowAugmentation",
+    #"PlugPlayFogAugmentation",
+    #"PlugPlayRainAugmentation",
+    #"PlugPlaySnowAugmentation",
+    #"ControlNetFogAugmentation",
+    #"ControlNetRainAugmentation",
+    #"ControlNetSnowAugmentation",
     "ControllableSDFogAugmentation",
     "ControllableSDRainAugmentation",
     "ControllableSDSnowAugmentation"
 ]
 
-ai_transforms = [
-    "CycleGAN",
-    "CUT",
-    "StableDiffusion",
-    "CycleDiffusion",
-    "MGIEDiffusion",
-]
-
-ai_conditions = [
-    "FogAugmentation",
-    "RainAugmentation",
-    "SnowAugmentation",
-]
-
 image_transforms = [
     "ColorAugmentation",
     "AutoContrastAugmentation",
-    "InvertAugmentation",
-    "EqualizeAugmentation",
+    #"InvertAugmentation",
+    #"EqualizeAugmentation",
     "SolarizeAugmentation",
     "PosterizeAugmentation",
     "ContrastAugmentation",
@@ -66,28 +133,48 @@ image_transforms = [
     "Defocus",
     "ZoomBlur",
     "MotionBlur",
-    "GlassBlur",
+    #"GlassBlur",
     "ShotNoise",
     "SaltAndPepper",
-    "RandomSnow",
+    #"RandomSnow",
     "RandomRain",
     "RandomGravel", 
     "RandomGamma",
-    "RandomFog",
+    #"RandomFog",
     "PlasmaBrightnessContrast",
     "IsoNoise",
     "HueSaturationValue",
     "Emboss",
     "ColorJitter",
-    "ChromaticAberration",
+    #"ChromaticAberration",
     "ChannelShuffle",
     "AdditiveNoise"
 ]
 
-dropout_transforms = ["CutoutAugmentation", "ChannelDropout", "PixelDropout"]
-weather_transforms = [ "FogAugmentation", "SnowAugmentation", "RainAugmentation", "DropAugmentation"]
-autoaugment_transforms = ["AutoAugmentAugmentation", "RandAugmentAugmentation", "TrivialWideAugmentation", "AugMixAugmentation"]
-geometric_transforms = ["ShearXAugmentation", "ShearYAugmentation", "TranslateXAugmentation", "TranslateYAugmentation", "RotationAugmentation"]
+dropout_transforms = [
+    "CutoutAugmentation",
+    "ChannelDropout", 
+    "PixelDropout"
+    ]
+weather_transforms = [ 
+    "FogAugmentation", 
+    #"SnowAugmentation", 
+    "RainAugmentation", 
+    #"DropAugmentation"
+    ]
+autoaugment_transforms = [
+    "AutoAugmentAugmentation", 
+    "RandAugmentAugmentation", 
+    "TrivialWideAugmentation", 
+    "AugMixAugmentation"]
+geometric_transforms = [
+    #"ShearXAugmentation", 
+    #"ShearYAugmentation", 
+    "TranslateXAugmentation", 
+    "TranslateYAugmentation", 
+    #"RotationAugmentation"
+    ]
+
 
 NUM_DATASETS = 32
 
@@ -248,10 +335,17 @@ class RandomSampler():
     
     def build_augmentation_stack(self, deep=True, overlay=True, standard=True, magnitude=0):
         # build augmentation stack, sample from deep, sample from overlays, sample from traditional
-        deep_augmentations = self.deep_augmentations(magnitude=magnitude, use_deep=deep)
-        overlay_augmentations = self.overlay_augmentations(magnitude=magnitude, use_overlay=overlay)
-        standard_augmentations = self.standard_augmentation(magnitude=magnitude, use_standard=standard)
-        post_processing = self.postprocessing_augmentations()
+        if not self.cfg.magnitude_shared:
+            deep_augmentations = self.deep_augmentations(magnitude=magnitude, use_deep=deep)
+            overlay_augmentations = self.overlay_augmentations(magnitude=magnitude, use_overlay=overlay)
+            standard_augmentations = self.standard_augmentation(magnitude=magnitude, use_standard=standard)
+            post_processing = self.postprocessing_augmentations()
+        else:
+            m_deep, m_overlay, m_standard = self.bounded_integer_split_into_three(magnitude, min_val=0, max_val=9)
+            deep_augmentations = self.deep_shared_augmentations(magnitude=m_deep, use_deep=deep)
+            overlay_augmentations = self.overlay_augmentations(magnitude=m_overlay, use_overlay=overlay)
+            standard_augmentations = self.standard_augmentation(magnitude=m_standard, use_standard=standard)
+            post_processing = self.postprocessing_augmentations()
 
         return deep_augmentations + overlay_augmentations + standard_augmentations + post_processing
     
@@ -259,6 +353,18 @@ class RandomSampler():
         if not use_deep:
             return []
         transforms = diffusion_transforms + gan_transforms
+        return self._sample(transforms, magnitude)
+    
+    def deep_shared_augmentations(self, magnitude=0, use_deep=True):
+        if not use_deep:
+            return []
+        # all deep transforms except controllable sd are fixed
+        # only sample from all deep transforms when magnitude is above 5
+        if magnitude > 5: 
+            transforms = diffusion_transforms + gan_transforms
+        else:
+            transforms = diffusion_transforms
+        
         return self._sample(transforms, magnitude)
     
     def overlay_augmentations(self, magnitude=0, use_overlay=True):
@@ -304,6 +410,24 @@ class RandomSampler():
             return transform(magnitude, cfg=self.cfg, device=self.device)
         else:
             return transform(magnitude, cfg=self.cfg)
+
+    def bounded_integer_split_into_three(self, magnitude, min_val=0, max_val=None):
+        if max_val is None:
+            max_val = magnitude
+
+        if 3 * min_val > magnitude or 3 * max_val < magnitude:
+            raise ValueError("Impossible to split magnitude into 3 integers within given bounds.")
+
+        while True:
+            # Randomly sample first two values within bounds
+            a = random.randint(min_val, max_val)
+            b = random.randint(min_val, max_val)
+            c = magnitude - a - b
+
+            # Check if the third value is within bounds
+            if min_val <= c <= max_val:
+                return a, b, c
+    
     
     # # old code
     # def _reorder_ops(self, ops, list):

@@ -101,7 +101,8 @@ def add_arguments():
     parser.add_argument("--iterations", type=int, default=3, help="Specify the number of itations")
     parser.add_argument("--weather", type=str, default="diverse", help="Specify an extra tag to separate datasets")
     parser.add_argument("--magnitude", type=int, default="0", help="Specify the applied magnitude")
-    parser.add_argument("--magnitude-fixed", action='store_true', help="Specify if the magnitude is fixed")
+    parser.add_argument("--magnitude_fixed", action='store_true', help="Specify if the magnitude is fixed")
+    parser.add_argument("--magnitude_shared", action='store_true', help="Specify if the magnitude is shared")
     parser.add_argument("--no_deep", action='store_false', help="Specify if deep augmentations are used")
     parser.add_argument("--no_overlay", action='store_false', help="Specify if weather overlays are used")
     parser.add_argument("--no_standard", action='store_false', help="Specify if standard augmentations are used")
@@ -122,6 +123,65 @@ def custom_setup_cyclegan_cut(cfg):
     if 'detr' in cfg.network:
         cfg.cutout_postprocessing = False
     return cfg
+
+
+def random_experiment(args):
+    setup_funcs = [setup_detr, setup_retinanet, setup_frcnn]
+    # magnitudes = [8,10,12,14,16,18,20]
+    magnitudes = [4,5,6,7,9,11,13,15,17,19]
+
+    for _ in range(args.iterations):
+        for setup_func, magnitude in product(setup_funcs, magnitudes):
+            cfg = setup_func(args)
+            cfg.box_postprocessing = args.bbox
+            cfg.cutout_postprocessing = args.cutout
+            cfg.frozen_backbone = args.frozen_backbone
+            cfg.progressive = args.progressive
+            cfg.weather = args.weather
+            cfg.SOLVER.MAX_ITER = 3000
+            cfg.TEST.EVAL_PERIOD = 0
+            cfg.DATALOADER.NUM_WORKERS = 0
+            cfg.experiment = args.experiment
+            cfg.aug_prob = 1.0
+            cfg.magnitude = magnitude
+            cfg.experiment_name = args.experiment_name
+            cfg.magnitude_fixed = args.magnitude_fixed
+            cfg.magnitude_shared = args.magnitude_shared
+            cfg.use_deep = args.no_deep
+            cfg.use_overlay = args.no_overlay
+            cfg.use_standard = args.no_standard
+            default_setup(cfg, args)
+
+            trainer = RandTrainer(cfg, augmentation=None)
+            trainer.resume_or_load(resume=args.resume)
+            trainer.train()
+            
+
+def progressive_augmentation(args):
+    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
+    iterations = 3
+
+    for _ in range(iterations):
+        for setup_func in setup_funcs:
+            cfg = setup_func(args)
+            cfg.box_postprocessing = args.bbox
+            cfg.cutout_postprocessing = args.cutout
+            cfg.frozen_backbone = False
+            default_setup(cfg, args)
+
+            # Set the configuration parameters
+            cfg.experiment = args.experiment
+            cfg.aug_prob = 1.0
+            cfg.rand_N = 1
+            cfg.rand_M = 0
+
+            sampler = TransformSampler(cfg, epochs=args.epochs)
+
+            for augmentation in sampler.experiment(experiment=cfg.experiment):
+                trainer = RandTrainer(cfg, augmentation=augmentation) 
+                trainer.resume_or_load(resume=args.resume)
+                trainer.train()
+
 
 def experiment(args):
     setup_funcs = [setup_detr, setup_retinanet]
@@ -156,73 +216,6 @@ def experiment(args):
             sampler = TransformSampler(cfg, epochs=args.epochs)
 
             for augmentation in sampler.augmentation(augmentation=aug, magnitude=magnitude):
-                trainer = RandTrainer(cfg, augmentation=augmentation) 
-                trainer.resume_or_load(resume=args.resume)
-                trainer.train()
-
-
-def random_experiment(args):
-    setup_funcs = [setup_detr, setup_frcnn, setup_retinanet]
-    transforms = image_transforms # geometric_transforms + weather_transforms + dropout_transforms
-    magnitudes = [9, 6, 3]
-
-    for _ in range(args.iterations):
-        for setup_func, aug, magnitude in product(setup_funcs, transforms, magnitudes):
-            cfg = setup_func(args)
-            cfg.box_postprocessing = args.bbox
-            cfg.cutout_postprocessing = args.cutout
-            cfg.frozen_backbone = args.frozen_backbone
-            cfg.progressive = args.progressive
-            cfg.weather = args.weather
-            cfg.SOLVER.MAX_ITER = 3000
-            cfg.TEST.EVAL_PERIOD = 0
-            cfg.DATALOADER.NUM_WORKERS = 0
-            cfg.experiment = args.experiment
-            cfg.aug_prob = 1.0
-            cfg.magnitude = magnitude
-            cfg.experiment_name = aug
-            cfg.magnitude_fixed = args.magnitude_fixed
-            cfg.use_deep = args.no_deep
-            cfg.use_overlay = args.no_overlay
-            cfg.use_standard = args.no_standard
-            
-            # if args.experiment_name == 'experiment_backbone_augmentation':
-            #     cfg = custom_setup_backbone_augmentation(cfg)
-            # elif args.experiment_name == 'experiment_backbone_cyclegan':
-            #     cfg = custom_setup_cyclegan_cut(cfg)
-
-            default_setup(cfg, args)
-
-
-            sampler = TransformSampler(cfg, epochs=args.epochs)
-
-            for augmentation in sampler.augmentation(augmentation=aug, magnitude=magnitude):
-                trainer = RandTrainer(cfg, augmentation=None)
-                trainer.resume_or_load(resume=args.resume)
-                trainer.train()
-
-
-def progressive_augmentation(args):
-    setup_funcs = [setup_frcnn, setup_detr, setup_retinanet]
-    iterations = 3
-
-    for _ in range(iterations):
-        for setup_func in setup_funcs:
-            cfg = setup_func(args)
-            cfg.box_postprocessing = args.bbox
-            cfg.cutout_postprocessing = args.cutout
-            cfg.frozen_backbone = False
-            default_setup(cfg, args)
-
-            # Set the configuration parameters
-            cfg.experiment = args.experiment
-            cfg.aug_prob = 1.0
-            cfg.rand_N = 1
-            cfg.rand_M = 0
-
-            sampler = TransformSampler(cfg, epochs=args.epochs)
-
-            for augmentation in sampler.experiment(experiment=cfg.experiment):
                 trainer = RandTrainer(cfg, augmentation=augmentation) 
                 trainer.resume_or_load(resume=args.resume)
                 trainer.train()

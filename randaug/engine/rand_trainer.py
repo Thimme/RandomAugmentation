@@ -344,6 +344,7 @@ class RandTrainer(TrainerBase):
                 results_a["iterations"] = iteration + 1
                 results_a["magnitude"] = cfg.magnitude
                 results_a["magnitude_fixed"] = cfg.magnitude_fixed
+                results_a["magnitude_shared"] = cfg.magnitude_shared
                 JSONResultsWriter(os.path.join(cfg.OUTPUT_DIR, "results.json")).write(results_a)
 
         if len(results) == 1:
